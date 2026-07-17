@@ -228,11 +228,14 @@ tbody tr:hover{background:rgba(255,255,255,.03)}
 .cal-day.empty{cursor:default}
 
 /* ---------- CATEGORY MANAGER ---------- */
-.cat-mgr{display:flex;flex-direction:column;gap:.6rem}
-.cat-node{border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--glass-brd);padding:.8rem}
-.cat-node .l1{display:flex;align-items:center;gap:.6rem;font-weight:600}
-.cat-children{margin-left:1.2rem;margin-top:.5rem;display:flex;flex-direction:column;gap:.4rem}
-.cat-leaf{display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:var(--muted)}
+.cat-mgr{display:flex;flex-direction:column;gap:.6rem;min-width:0}
+.cat-node{border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--glass-brd);
+  padding:.8rem;min-width:0;overflow:hidden}
+.cat-node .l1{display:flex;align-items:center;gap:.6rem;font-weight:600;flex-wrap:wrap}
+.cat-children{margin-left:1rem;margin-top:.5rem;display:flex;flex-direction:column;gap:.4rem;min-width:0}
+.cat-leaf{display:flex;align-items:center;gap:.4rem;row-gap:.35rem;font-size:.85rem;
+  color:var(--muted);flex-wrap:wrap;min-width:0}
+.cat-leaf .tag{white-space:normal;overflow-wrap:anywhere}
 .chip-add{font-size:.75rem;color:var(--violet);cursor:pointer;background:none;border:none;font-family:inherit}
 .mini-x{cursor:pointer;color:var(--muted);font-size:.9rem;line-height:1}
 .mini-x:hover{color:var(--red)}
@@ -284,6 +287,9 @@ tbody tr:hover{background:rgba(255,255,255,.03)}
   .filter-bar .fg{min-width:0;width:100%}
   .filter-bar input[type=date]{max-width:none}
   .filter-bar .btn{width:100%;justify-content:center}
+
+  /* Settings: shallower tree indent so nested rows fit */
+  .cat-children{margin-left:.5rem}
 
   /* Dashboard controls: chips scroll in a row, timeframe below full-width */
   .controls{gap:.45rem;padding:.6rem .7rem}
