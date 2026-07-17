@@ -227,17 +227,28 @@ tbody tr:hover{background:rgba(255,255,255,.03)}
 .cal-day.sel{background:var(--grad);color:#fff;font-weight:600}
 .cal-day.empty{cursor:default}
 
-/* ---------- CATEGORY MANAGER ---------- */
-.cat-mgr{display:flex;flex-direction:column;gap:.6rem;min-width:0}
-.cat-node{border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--glass-brd);
-  padding:.8rem;min-width:0;overflow:hidden}
-.cat-node .l1{display:flex;align-items:center;gap:.6rem;font-weight:600;flex-wrap:wrap}
-.cat-children{margin-left:1rem;margin-top:.5rem;display:flex;flex-direction:column;gap:.4rem;min-width:0}
-.cat-leaf{display:flex;align-items:center;gap:.4rem;row-gap:.35rem;font-size:.85rem;
-  color:var(--muted);flex-wrap:wrap;min-width:0}
-.cat-leaf .tag{white-space:normal;overflow-wrap:anywhere}
-.chip-add{font-size:.75rem;color:var(--violet);cursor:pointer;background:none;border:none;font-family:inherit}
-.mini-x{cursor:pointer;color:var(--muted);font-size:.9rem;line-height:1}
+/* ---------- CATEGORY MANAGER (accordion) ---------- */
+.cat-mgr{display:flex;flex-direction:column;gap:.55rem;min-width:0}
+.cat-node{border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--glass-brd);
+  min-width:0;overflow:hidden}
+.cat-head{display:flex;align-items:center;gap:.55rem;padding:.7rem .8rem;cursor:pointer;user-select:none}
+.cat-head:hover{background:rgba(255,255,255,.04)}
+.chev{color:var(--muted);font-size:.75rem;width:.9rem;flex-shrink:0}
+.cat-name{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cat-count{font-size:.7rem;color:var(--muted);background:rgba(255,255,255,.07);
+  padding:.1rem .5rem;border-radius:999px;flex-shrink:0}
+.head-actions{display:flex;gap:.3rem;flex-shrink:0}
+.cat-body{padding:.15rem .8rem .7rem;display:flex;flex-direction:column;gap:.4rem}
+.cat-empty{color:var(--muted);font-size:.8rem;padding:.2rem 0}
+.sub-row{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
+  border-radius:10px;padding:.5rem .6rem;min-width:0}
+.sub-head{display:flex;align-items:center;gap:.5rem;min-width:0}
+.sub-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.88rem}
+.chip-row{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem}
+.chip{font-size:.72rem;padding:.22rem .6rem;border-radius:999px;background:rgba(124,92,255,.18);
+  color:#c4b5fd;display:inline-flex;align-items:center;gap:.3rem;max-width:100%;
+  overflow-wrap:anywhere}
+.mini-x{cursor:pointer;color:var(--muted);font-size:.85rem;line-height:1}
 .mini-x:hover{color:var(--red)}
 
 /* ---------- MISC ---------- */
@@ -287,9 +298,6 @@ tbody tr:hover{background:rgba(255,255,255,.03)}
   .filter-bar .fg{min-width:0;width:100%}
   .filter-bar input[type=date]{max-width:none}
   .filter-bar .btn{width:100%;justify-content:center}
-
-  /* Settings: shallower tree indent so nested rows fit */
-  .cat-children{margin-left:.5rem}
 
   /* Dashboard controls: chips scroll in a row, timeframe below full-width */
   .controls{gap:.45rem;padding:.6rem .7rem}

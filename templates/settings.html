@@ -43,46 +43,93 @@
 <script>
 let TREE = {{ settings.category_hierarchy|tojson }};
 const mgr = document.getElementById('cat-mgr');
+const expanded = new Set();  // which top-level categories are open
+
+function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+}
+
+function actBtn(label, act, data, danger) {
+    const b = el('button', 'icon-btn' + (danger ? ' danger' : ''), label);
+    b.dataset.act = act;
+    Object.entries(data).forEach(([k, v]) => b.dataset[k] = v);
+    return b;
+}
 
 function render() {
     mgr.innerHTML = '';
     Object.keys(TREE).forEach(c1 => {
-        const node = document.createElement('div');
-        node.className = 'cat-node';
-        let childrenHtml = '';
-        Object.keys(TREE[c1]).forEach(c2 => {
+        const subs = Object.keys(TREE[c1]);
+        const node = el('div', 'cat-node');
+
+        // Header row: chevron | name | count | fixed-width actions
+        const head = el('div', 'cat-head');
+        head.dataset.c1 = c1;
+        head.appendChild(el('span', 'chev', expanded.has(c1) ? '▾' : '▸'));
+        head.appendChild(el('span', 'cat-name', c1));
+        head.appendChild(el('span', 'cat-count', String(subs.length)));
+        const hActions = el('span', 'head-actions');
+        hActions.appendChild(actBtn('＋', 'add2', {c1}));
+        hActions.appendChild(actBtn('✕', 'del1', {c1}, true));
+        head.appendChild(hActions);
+        node.appendChild(head);
+
+        // Body: one block row per sub-category
+        const body = el('div', 'cat-body' + (expanded.has(c1) ? '' : ' hidden'));
+        if (!subs.length) {
+            body.appendChild(el('div', 'cat-empty', 'No sub-categories yet'));
+        }
+        subs.forEach(c2 => {
+            const row = el('div', 'sub-row');
+            const sh = el('div', 'sub-head');
+            sh.appendChild(el('span', 'sub-name', c2));
+            const sActions = el('span', 'head-actions');
+            sActions.appendChild(actBtn('＋', 'add3', {c1, c2}));
+            sActions.appendChild(actBtn('✕', 'del2', {c1, c2}, true));
+            sh.appendChild(sActions);
+            row.appendChild(sh);
+
             const leaves = TREE[c1][c2] || [];
-            const leafHtml = leaves.map(l3 =>
-                `<span class="tag">${l3} <span class="mini-x" data-act="del3" data-c1="${c1}" data-c2="${c2}" data-c3="${l3}">✕</span></span>`
-            ).join(' ');
-            childrenHtml += `
-              <div class="cat-leaf">
-                <span style="color:var(--text)">${c2}</span>
-                ${leafHtml}
-                <button class="chip-add" data-act="add3" data-c1="${c1}" data-c2="${c2}">+ sub-sub</button>
-                <span class="mini-x" data-act="del2" data-c1="${c1}" data-c2="${c2}">✕</span>
-              </div>`;
+            if (leaves.length) {
+                const chips = el('div', 'chip-row');
+                leaves.forEach(l3 => {
+                    const chip = el('span', 'chip', l3 + ' ');
+                    const x = el('span', 'mini-x', '✕');
+                    x.dataset.act = 'del3';
+                    x.dataset.c1 = c1; x.dataset.c2 = c2; x.dataset.c3 = l3;
+                    chip.appendChild(x);
+                    chips.appendChild(chip);
+                });
+                row.appendChild(chips);
+            }
+            body.appendChild(row);
         });
-        node.innerHTML = `
-          <div class="l1">
-            <span>${c1}</span>
-            <button class="chip-add" data-act="add2" data-c1="${c1}">+ sub</button>
-            <span class="mini-x" data-act="del1" data-c1="${c1}" style="margin-left:auto">✕</span>
-          </div>
-          <div class="cat-children">${childrenHtml || '<span style="color:var(--muted);font-size:.8rem">No sub-categories</span>'}</div>`;
+        node.appendChild(body);
         mgr.appendChild(node);
     });
 }
 
 mgr.addEventListener('click', (e) => {
-    const el = e.target.closest('[data-act]');
-    if (!el) return;
-    const {act, c1, c2, c3} = el.dataset;
-    if (act === 'del1') { if (confirm(`Delete "${c1}" and all its sub-categories?`)) delete TREE[c1]; }
+    const t = e.target.closest('[data-act]');
+    if (!t) {
+        // Click on a header (not an action) toggles expand/collapse
+        const head = e.target.closest('.cat-head');
+        if (head) {
+            const c1 = head.dataset.c1;
+            expanded.has(c1) ? expanded.delete(c1) : expanded.add(c1);
+            render();
+        }
+        return;
+    }
+    const {act, c1, c2, c3} = t.dataset;
+    if (act === 'del1') { if (confirm(`Delete "${c1}" and all its sub-categories?`)) { delete TREE[c1]; expanded.delete(c1); } }
     if (act === 'del2') delete TREE[c1][c2];
     if (act === 'del3') TREE[c1][c2] = TREE[c1][c2].filter(x => x !== c3);
-    if (act === 'add2') { const n = prompt('New sub-category under ' + c1); if (n) TREE[c1][n] = TREE[c1][n] || []; }
-    if (act === 'add3') { const n = prompt(`New sub-sub under ${c1} › ${c2}`); if (n && !TREE[c1][c2].includes(n)) TREE[c1][c2].push(n); }
+    if (act === 'add2') { const n = prompt('New sub-category under ' + c1); if (n) { TREE[c1][n] = TREE[c1][n] || []; expanded.add(c1); } }
+    if (act === 'add3') { const n = prompt(`New sub-sub under ${c1} › ${c2}`); if (n && !TREE[c1][c2].includes(n)) { TREE[c1][c2].push(n); expanded.add(c1); } }
     render();
 });
 
