@@ -119,17 +119,38 @@ CURRENCIES = {
 # Shape: { category_1: { category_2: [category_3, ...] } }
 DEFAULT_HIERARCHY = {
     'Food': {
-        'Groceries': [], 'Lunch': [], 'Dinner': ['Delivery'], 'Drinks': [],
-        'Snacks': [], 'Breakfast': [],
+        'Groceries': ['Delhaize', 'Carrefour'], 'Lunch': ['Office'],
+        'Dinner': ['Delivery'], 'Drinks': [], 'Snacks': ['Carrefour'],
+        'Snack': [], 'Breakfast': ['Office'], 'Aperitivo': [],
     },
     'Miscellaneous': {
-        'Shopping': ['Clothes', 'Tech'], 'Gifts': [], 'Personal': ['Barbershop'],
-        'Entertainment': ['Cinema'], 'Unknown': [],
+        'Shopping': ['Clothes', 'Tech', 'Cigars', 'Anime/Manga/Cards',
+                     'Books', 'Music', 'House'],
+        'Gifts': [], 'Personal': ['Barbershop', 'Health', 'Sport', 'Gym', 'Half-Marathon'],
+        'Entertainment': ['Tickets', 'Cinema'], 'Gambling': [], 'Unknown': [],
     },
-    'Transportation': {'Carsharing': [], 'Uber': [], 'Bike': []},
-    'Investments': {'Business': [], 'Crypto': [], 'Savings': []},
-    'Subscriptions': {'Mobile': []},
-    'Income': {'Salary': ['Base']},
+    'Transportation': {
+        'Car Rental': [], 'Uber': [], 'Bus': [], 'Train': [], 'Tolls': [],
+        'Gas': [], 'Parking': [], 'Fines': [], 'Carsharing': [], 'Bike': [],
+    },
+    'Investments': {
+        'Business': [], 'Bitcoin DCA': ['Saveback', 'Weekly Savings'],
+        'RSUs': [], 'Stocks': [], 'Roundup': [], 'Pension Plan': [],
+        'Crypto': [], 'Savings': [],
+    },
+    'Subscriptions': {
+        'Amex': [], 'Phone Plan': [], 'iCloud': [], 'Gym': [], 'Sports': [],
+        'Wolt': [], 'Spotify': [], 'Amazon': [], 'Kotcha': [], 'FinX': [],
+        'Revolut': [], 'Spuerkeess': [], 'Mobile': [],
+    },
+    'Income': {
+        'Business': ['Vinted'], 'Salary': ['Base', 'Vouchers', 'RSUs'],
+        'Fantacalcio': [], 'Gambling': [], 'Gifts': [], 'Interest': [], 'Saveback': [],
+    },
+    'House': {'Rent': [], 'Charges': [], 'Cleaning': [], 'Groceries': []},
+    'Travel': {'Hotel': [], 'Flight': [], 'Bus': [], 'Phone Plan': []},
+    'Installments': {'iPhone': [], 'Airpods': []},
+    'Shopping': {'Business': []},
 }
 
 # Quick-add buttons -> exact path in the hierarchy [cat1, cat2, cat3].
@@ -165,16 +186,21 @@ def _b(val):
 
 
 def parse_date(val):
-    """Accept ISO (YYYY-MM-DD) or M/D/YYYY, return ISO string or None."""
+    """Accept ISO (YYYY-MM-DD), M/D/YYYY, or those with a trailing time; return ISO or None."""
     if not val:
         return None
     val = str(val).strip()
-    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y'):
+    for fmt in ('%Y-%m-%d', '%m/%d/%Y', '%d/%m/%Y',
+                '%Y-%m-%d %H:%M:%S', '%m/%d/%Y %H:%M:%S'):
         try:
             return datetime.strptime(val, fmt).date().isoformat()
         except ValueError:
             continue
-    return None
+    # Fallback: take an ISO date prefix (handles unexpected trailing text)
+    try:
+        return datetime.strptime(val[:10], '%Y-%m-%d').date().isoformat()
+    except ValueError:
+        return None
 
 
 # --- SETTINGS ---
