@@ -63,6 +63,7 @@ def dashboard():
         exclude_rsu=exclude_rsu,
         exclude_one_off=exclude_one_off,
         compare_months=compare,
+        all_txs=all_txs,
     )
     return render_template(
         'dashboard.html',

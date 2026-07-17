@@ -204,11 +204,20 @@ def parse_date(val):
 
 
 # --- SETTINGS ---
+_settings_cache = {'data': None, 'at': 0.0}
+_SETTINGS_TTL = 60  # seconds; settings change rarely, invalidated on update
+
+
 def get_settings():
     if DEMO:
         _ensure_seed()
         return {'currency': _demo_settings.get('currency', 'EUR'),
                 'category_hierarchy': _demo_settings.get('category_hierarchy', DEFAULT_HIERARCHY)}
+
+    import time as _time
+    if _settings_cache['data'] is not None and _time.time() - _settings_cache['at'] < _SETTINGS_TTL:
+        return _settings_cache['data']
+
     client = get_client()
     rows = client.table('settings').select('*').eq('id', 1).execute().data
     if not rows:
@@ -216,7 +225,9 @@ def get_settings():
             'id': 1, 'currency': 'EUR',
             'category_hierarchy': DEFAULT_HIERARCHY,
         }).execute()
-        return {'currency': 'EUR', 'category_hierarchy': DEFAULT_HIERARCHY}
+        result = {'currency': 'EUR', 'category_hierarchy': DEFAULT_HIERARCHY}
+        _settings_cache.update(data=result, at=_time.time())
+        return result
 
     row = rows[0]
     hierarchy = row.get('category_hierarchy')
@@ -230,10 +241,13 @@ def get_settings():
         hierarchy = DEFAULT_HIERARCHY
         client.table('settings').update(
             {'category_hierarchy': hierarchy}).eq('id', 1).execute()
-    return {'currency': _s(row.get('currency'), 'EUR'), 'category_hierarchy': hierarchy}
+    result = {'currency': _s(row.get('currency'), 'EUR'), 'category_hierarchy': hierarchy}
+    _settings_cache.update(data=result, at=_time.time())
+    return result
 
 
 def update_settings(currency=None, hierarchy=None):
+    _settings_cache.update(data=None, at=0.0)  # invalidate cache on any write
     if DEMO:
         _ensure_seed()
         if currency is not None:
@@ -444,10 +458,13 @@ def _timeframe_bounds(timeframe):
 
 
 def get_dashboard_data(timeframe='this_month', exclude_investments=False,
-                       exclude_rsu=False, exclude_one_off=False, compare_months=None):
+                       exclude_rsu=False, exclude_one_off=False, compare_months=None,
+                       all_txs=None):
     """Compute stats, category breakdown, recent list, and the cumulative
-    spending chart series (current month + comparison months)."""
-    all_txs = get_transactions()
+    spending chart series (current month + comparison months).
+    Pass all_txs to reuse an already-fetched list and avoid a second DB trip."""
+    if all_txs is None:
+        all_txs = get_transactions()
 
     # --- Stats for the selected timeframe ---
     df, dt = _timeframe_bounds(timeframe)
