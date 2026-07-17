@@ -227,27 +227,38 @@ tbody tr:hover{background:rgba(255,255,255,.03)}
 .cal-day.sel{background:var(--grad);color:#fff;font-weight:600}
 .cal-day.empty{cursor:default}
 
-/* ---------- CATEGORY MANAGER (accordion) ---------- */
+/* ---------- CATEGORY MANAGER (accordion, color-coded levels) ----------
+   Level 1 (category)     = violet, card header
+   Level 2 (sub-category) = cyan, indented rows on a violet rail
+   Level 3 (sub-sub)      = pink chips, further indented on a cyan rail   */
 .cat-mgr{display:flex;flex-direction:column;gap:.55rem;min-width:0}
 .cat-node{border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--glass-brd);
-  min-width:0;overflow:hidden}
+  border-left:3px solid rgba(124,92,255,.65);min-width:0;overflow:hidden}
 .cat-head{display:flex;align-items:center;gap:.55rem;padding:.7rem .8rem;cursor:pointer;user-select:none}
-.cat-head:hover{background:rgba(255,255,255,.04)}
-.chev{color:var(--muted);font-size:.75rem;width:.9rem;flex-shrink:0}
-.cat-name{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cat-count{font-size:.7rem;color:var(--muted);background:rgba(255,255,255,.07);
+.cat-head:hover{background:rgba(124,92,255,.08)}
+.chev{color:var(--violet);font-size:.75rem;width:.9rem;flex-shrink:0}
+.cat-name{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap;color:#c4b5fd;letter-spacing:.2px}
+.cat-count{font-size:.7rem;color:var(--violet);background:rgba(124,92,255,.15);
   padding:.1rem .5rem;border-radius:999px;flex-shrink:0}
 .head-actions{display:flex;gap:.3rem;flex-shrink:0}
-.cat-body{padding:.15rem .8rem .7rem;display:flex;flex-direction:column;gap:.4rem}
+
+/* Level 2: indented, hanging off a violet tree rail */
+.cat-body{margin-left:1.05rem;padding:.15rem .8rem .7rem .75rem;display:flex;
+  flex-direction:column;gap:.45rem;border-left:2px solid rgba(124,92,255,.28)}
 .cat-empty{color:var(--muted);font-size:.8rem;padding:.2rem 0}
-.sub-row{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);
-  border-radius:10px;padding:.5rem .6rem;min-width:0}
+.sub-row{background:rgba(34,211,238,.05);border:1px solid rgba(34,211,238,.14);
+  border-left:3px solid rgba(34,211,238,.55);border-radius:10px;padding:.5rem .6rem;min-width:0}
 .sub-head{display:flex;align-items:center;gap:.5rem;min-width:0}
-.sub-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.88rem}
-.chip-row{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem}
-.chip{font-size:.72rem;padding:.22rem .6rem;border-radius:999px;background:rgba(124,92,255,.18);
-  color:#c4b5fd;display:inline-flex;align-items:center;gap:.3rem;max-width:100%;
-  overflow-wrap:anywhere}
+.sub-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:.88rem;font-weight:600;color:#a5f3fc}
+
+/* Level 3: pink chips, indented again on a cyan rail */
+.chip-row{display:flex;flex-wrap:wrap;gap:.35rem;margin-top:.45rem;margin-left:.55rem;
+  padding-left:.6rem;border-left:2px solid rgba(34,211,238,.25)}
+.chip{font-size:.72rem;padding:.22rem .6rem;border-radius:999px;background:rgba(236,72,153,.16);
+  border:1px solid rgba(236,72,153,.25);color:#f9a8d4;display:inline-flex;align-items:center;
+  gap:.3rem;max-width:100%;overflow-wrap:anywhere}
 .mini-x{cursor:pointer;color:var(--muted);font-size:.85rem;line-height:1}
 .mini-x:hover{color:var(--red)}
 
