@@ -1,0 +1,14 @@
+# Render deployment blueprint for Fluxo
+# Docs: https://render.com/docs/blueprint-spec
+services:
+  - type: web
+    name: fluxo
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: SUPABASE_URL
+        sync: false   # set this in the Render dashboard (secret)
+      - key: SUPABASE_KEY
+        sync: false   # set this in the Render dashboard (secret)

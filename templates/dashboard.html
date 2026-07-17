@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Overview</h1>
+        <div class="sub">Your money, at a glance</div>
+    </div>
+    <a href="{{ url_for('add_transaction_view') }}" class="btn">+ Add Transaction</a>
+</div>
+
+<!-- Filters -->
+<form method="get" id="filter-form" class="controls glass">
+    <label class="toggle-chip {% if filters.exclude_investments %}on{% endif %}">
+        <input type="checkbox" name="exclude_investments" value="1" onchange="this.form.submit()"
+               {% if filters.exclude_investments %}checked{% endif %}> Exclude investments
+    </label>
+    <label class="toggle-chip {% if filters.exclude_rsu %}on{% endif %}">
+        <input type="checkbox" name="exclude_rsu" value="1" onchange="this.form.submit()"
+               {% if filters.exclude_rsu %}checked{% endif %}> Exclude RSUs
+    </label>
+    <label class="toggle-chip {% if filters.exclude_one_off %}on{% endif %}">
+        <input type="checkbox" name="exclude_one_off" value="1" onchange="this.form.submit()"
+               {% if filters.exclude_one_off %}checked{% endif %}> Exclude one-offs
+    </label>
+    <div style="margin-left:auto;min-width:170px">
+        <select name="timeframe" onchange="this.form.submit()">
+            <option value="this_month" {% if filters.timeframe=='this_month' %}selected{% endif %}>This month</option>
+            <option value="last_month" {% if filters.timeframe=='last_month' %}selected{% endif %}>Last month</option>
+            <option value="last_3_months" {% if filters.timeframe=='last_3_months' %}selected{% endif %}>Last 3 months</option>
+            <option value="ytd" {% if filters.timeframe=='ytd' %}selected{% endif %}>Year to date</option>
+            <option value="all" {% if filters.timeframe=='all' %}selected{% endif %}>All time</option>
+        </select>
+    </div>
+    {% for m in selected_compare %}<input type="hidden" name="compare" value="{{ m }}">{% endfor %}
+</form>
+
+<!-- Stats -->
+<div class="metrics">
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--green)"></span>Inflow</div>
+        <div class="val pos">{{ currency_symbol }}{{ data.stats.inflow|money }}</div>
+    </div>
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--red)"></span>Outflow</div>
+        <div class="val">{{ currency_symbol }}{{ data.stats.outflow|money }}</div>
+    </div>
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--cyan)"></span>Net savings</div>
+        <div class="val {% if data.stats.net >= 0 %}pos{% else %}neg{% endif %}">
+            {{ currency_symbol }}{{ data.stats.net|money }}
+        </div>
+    </div>
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--violet)"></span>Investments</div>
+        <div class="val">{{ currency_symbol }}{{ data.stats.investments|money }}</div>
+    </div>
+</div>
+
+<!-- Spending chart -->
+<div class="chart-card glass">
+    <div class="chart-head">
+        <div>
+            <h2 style="margin:0">Cumulative spending</h2>
+            <div class="sub" style="color:var(--muted);font-size:.85rem">Daily running outflow, current month vs. comparisons</div>
+        </div>
+        {% if data.chart.rank_total > 1 %}
+        <span class="rank-badge">#{{ data.chart.rank }} of {{ data.chart.rank_total }} as of day {{ data.chart.rank_day }}</span>
+        {% endif %}
+    </div>
+    <div class="chart-box"><canvas id="spendChart"></canvas></div>
+
+    <div class="month-picker" id="month-picker">
+        {% for m in months %}
+        <span class="month-opt {% if m in selected_compare %}sel{% endif %}" data-month="{{ m }}">{{ m }}</span>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="split">
+    <!-- Category breakdown -->
+    <div class="panel glass">
+        <h2>Spending by category</h2>
+        {% if data.breakdown %}
+            {% for c in data.breakdown %}
+            <div class="cat-row">
+                <div class="name">{{ c.category }}</div>
+                <div class="cat-bar"><span style="width:{{ c.pct }}%"></span></div>
+                <div class="amt">{{ currency_symbol }}{{ c.amount|money }}</div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="empty"><div class="big">🫧</div>No spending in this period yet.</div>
+        {% endif %}
+    </div>
+
+    <!-- Recent transactions -->
+    <div class="panel glass">
+        <h2>Recent transactions</h2>
+        {% if data.recent %}
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    {% for t in data.recent %}
+                    <tr>
+                        <td style="color:var(--muted);font-size:.8rem">{{ t.date }}</td>
+                        <td>{{ t.category_1 }}{% if t.category_2 %} <span style="color:var(--muted)">› {{ t.category_2 }}</span>{% endif %}</td>
+                        <td class="num {% if t.transaction_type=='inflow' %}pos{% endif %}">
+                            {% if t.transaction_type=='inflow' %}+{% else %}−{% endif %}{{ currency_symbol }}{{ t.amount|money }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+            <div class="empty"><div class="big">📭</div>No transactions yet. Add your first one!</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+Chart.defaults.font.family = "'Space Grotesk', sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = '#a0a3c0';
+
+const CHART = {{ chart_json|safe }};
+const palette = ['#7c5cff','#22d3ee','#ec4899','#4ade80','#f59e0b','#60a5fa','#f472b6','#a78bfa'];
+
+const datasets = CHART.series.map((s, i) => ({
+    label: s.label,
+    data: s.data,
+    borderColor: s.is_current ? '#7c5cff' : palette[(i+1) % palette.length],
+    backgroundColor: 'transparent',
+    borderWidth: s.is_current ? 3 : 1.6,
+    borderDash: s.is_current ? [] : [5,4],
+    tension: .25,
+    pointRadius: 0,
+    pointHoverRadius: 4,
+    spanGaps: false,
+}));
+
+new Chart(document.getElementById('spendChart'), {
+    type: 'line',
+    data: { labels: CHART.labels, datasets },
+    options: {
+        responsive: true, maintainAspectRatio: false,
+        interaction: { mode: 'index', intersect: false },
+        plugins: {
+            legend: { labels: { color: '#a0a3c0', usePointStyle: true, boxWidth: 8 } },
+            tooltip: { callbacks: { title: (items) => 'Day ' + items[0].label } }
+        },
+        scales: {
+            x: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#a0a3c0', maxTicksLimit: 15 } },
+            y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#a0a3c0' } }
+        }
+    }
+});
+
+// Month picker -> toggle compare params and reload
+document.getElementById('month-picker').addEventListener('click', (e) => {
+    const opt = e.target.closest('.month-opt');
+    if (!opt) return;
+    const url = new URL(window.location.href);
+    const month = opt.dataset.month;
+    let compare = url.searchParams.getAll('compare');
+    url.searchParams.delete('compare');
+    if (compare.includes(month)) compare = compare.filter(m => m !== month);
+    else compare.push(month);
+    compare.forEach(m => url.searchParams.append('compare', m));
+    window.location.href = url.toString();
+});
+</script>
+{% endblock %}

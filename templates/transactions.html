@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+{% block title %}Transactions{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Transactions <span class="count-badge">{{ summary.count }}</span></h1>
+        <div class="sub">Search, filter, edit and export</div>
+    </div>
+    <div style="display:flex;gap:.6rem">
+        <a href="{{ url_for('export_csv') }}" class="btn ghost">⬇ Export CSV</a>
+        <a href="{{ url_for('add_transaction_view') }}" class="btn">+ Add Transaction</a>
+    </div>
+</div>
+
+<!-- Summary -->
+<div class="metrics">
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--green)"></span>Inflow</div>
+        <div class="val pos">{{ currency_symbol }}{{ summary.inflow|money }}</div>
+    </div>
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--red)"></span>Outflow</div>
+        <div class="val">{{ currency_symbol }}{{ summary.outflow|money }}</div>
+    </div>
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--cyan)"></span>Net</div>
+        <div class="val {% if summary.net >= 0 %}pos{% else %}neg{% endif %}">{{ currency_symbol }}{{ summary.net|money }}</div>
+    </div>
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--violet)"></span>Count</div>
+        <div class="val">{{ summary.count }}</div>
+    </div>
+</div>
+
+<!-- Filters -->
+<form method="get" class="filter-bar glass">
+    <div class="fg" style="flex:1;min-width:200px">
+        <label>Search</label>
+        <input type="search" name="search" value="{{ filters.search }}" placeholder="category, method, notes…">
+    </div>
+    <div class="fg">
+        <label>Category</label>
+        <select name="category_1">
+            <option value="">All</option>
+            {% for c1 in hierarchy.keys() %}
+            <option value="{{ c1 }}" {% if filters.category_1==c1 %}selected{% endif %}>{{ c1 }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    <div class="fg">
+        <label>From</label>
+        <input type="date" name="date_from" value="{{ filters.date_from }}">
+    </div>
+    <div class="fg">
+        <label>To</label>
+        <input type="date" name="date_to" value="{{ filters.date_to }}">
+    </div>
+    <button type="submit" class="btn">Apply</button>
+    <a href="{{ url_for('transactions_view') }}" class="btn ghost">Clear</a>
+</form>
+
+<!-- Table -->
+<div class="glass" style="padding:.4rem 1rem">
+    {% if transactions %}
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Date</th><th>Type</th><th>Category</th><th>Method</th>
+                    <th>Details</th><th class="num">Amount</th><th></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in transactions %}
+                <tr>
+                    <td style="white-space:nowrap;color:var(--muted)">{{ t.date }}</td>
+                    <td>
+                        <span class="tag {{ 'in' if t.transaction_type=='inflow' else 'out' }}">{{ t.transaction_type }}</span>
+                        {% if t.is_one_off %}<span class="tag one">one-off</span>{% endif %}
+                    </td>
+                    <td>
+                        {{ t.category_1 }}{% if t.category_2 %} <span style="color:var(--muted)">› {{ t.category_2 }}</span>{% endif %}{% if t.category_3 %} <span style="color:var(--muted)">› {{ t.category_3 }}</span>{% endif %}
+                    </td>
+                    <td>{{ t.method }}</td>
+                    <td style="color:var(--muted)">{{ t.details }}</td>
+                    <td class="num {% if t.transaction_type=='inflow' %}pos{% endif %}">
+                        {% if t.transaction_type=='inflow' %}+{% else %}−{% endif %}{{ currency_symbol }}{{ t.amount|money }}
+                    </td>
+                    <td>
+                        <div class="row-actions">
+                            <a class="icon-btn" href="{{ url_for('edit_transaction_view', tx_id=t.id) }}" title="Edit">✎</a>
+                            <form method="post" action="{{ url_for('delete_transaction', tx_id=t.id) }}"
+                                  onsubmit="return confirm('Delete this transaction?')">
+                                <button class="icon-btn danger" title="Delete">🗑</button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+        <div class="empty"><div class="big">🔍</div>No transactions match your filters.</div>
+    {% endif %}
+</div>
+
+{% if request.args.get('imported') %}
+<div class="toast" id="toast">Imported {{ request.args.get('imported') }} transactions ✓</div>
+<script>setTimeout(()=>document.getElementById('toast').remove(),3500)</script>
+{% endif %}
+{% endblock %}

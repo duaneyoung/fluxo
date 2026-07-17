@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Fluxo — {% block title %}Dashboard{% endblock %}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0e1020">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <div class="app-shell">
+        <!-- Mobile top bar -->
+        <header class="mobile-bar">
+            <button class="hamburger" onclick="document.body.classList.toggle('nav-open')" aria-label="Menu">☰</button>
+            <div class="mobile-brand"><span class="logo-mark">◈</span> Fluxo</div>
+        </header>
+
+        <div class="nav-scrim" onclick="document.body.classList.remove('nav-open')"></div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="logo-mark">◈</div>
+                <div>
+                    <div class="brand-title">Fluxo</div>
+                    <div class="brand-sub">Personal Finance Tracker</div>
+                </div>
+            </div>
+            <nav class="nav">
+                <a href="{{ url_for('dashboard') }}" class="nav-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                    <span class="nav-ico">📊</span> Dashboard
+                </a>
+                <a href="{{ url_for('transactions_view') }}" class="nav-link {% if request.endpoint in ['transactions_view', 'add_transaction_view', 'edit_transaction_view'] %}active{% endif %}">
+                    <span class="nav-ico">📋</span> Transactions
+                </a>
+                <a href="{{ url_for('settings_view') }}" class="nav-link {% if request.endpoint == 'settings_view' %}active{% endif %}">
+                    <span class="nav-ico">⚙️</span> Settings
+                </a>
+            </nav>
+            <div class="sidebar-foot">
+                <span class="cur-pill">{{ currency_code }} {{ currency_symbol }}</span>
+            </div>
+        </aside>
+
+        <!-- Main -->
+        <main class="content">
+            {% block content %}{% endblock %}
+        </main>
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

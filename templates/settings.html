@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Settings</h1>
+        <div class="sub">Currency and your category tree</div>
+    </div>
+</div>
+
+<!-- Currency -->
+<div class="glass panel" style="margin-bottom:1.4rem">
+    <h2>Currency</h2>
+    <form method="post" action="{{ url_for('save_currency') }}" style="display:flex;gap:.8rem;align-items:end;max-width:340px">
+        <div class="fg" style="flex:1">
+            <label>Display currency</label>
+            <select name="currency">
+                {% for code, sym in currencies.items() %}
+                <option value="{{ code }}" {% if settings.currency==code %}selected{% endif %}>{{ code }} ({{ sym }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button type="submit" class="btn">Save</button>
+    </form>
+</div>
+
+<!-- Category manager -->
+<div class="glass panel">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+        <h2 style="margin:0">Category tree</h2>
+        <div style="display:flex;gap:.6rem">
+            <button class="btn ghost sm" id="add-l1">+ Top category</button>
+            <button class="btn sm" id="save-cats">Save changes</button>
+        </div>
+    </div>
+    <div class="cat-mgr" id="cat-mgr"></div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let TREE = {{ settings.category_hierarchy|tojson }};
+const mgr = document.getElementById('cat-mgr');
+
+function render() {
+    mgr.innerHTML = '';
+    Object.keys(TREE).forEach(c1 => {
+        const node = document.createElement('div');
+        node.className = 'cat-node';
+        let childrenHtml = '';
+        Object.keys(TREE[c1]).forEach(c2 => {
+            const leaves = TREE[c1][c2] || [];
+            const leafHtml = leaves.map(l3 =>
+                `<span class="tag">${l3} <span class="mini-x" data-act="del3" data-c1="${c1}" data-c2="${c2}" data-c3="${l3}">✕</span></span>`
+            ).join(' ');
+            childrenHtml += `
+              <div class="cat-leaf">
+                <span style="color:var(--text)">${c2}</span>
+                ${leafHtml}
+                <button class="chip-add" data-act="add3" data-c1="${c1}" data-c2="${c2}">+ sub-sub</button>
+                <span class="mini-x" data-act="del2" data-c1="${c1}" data-c2="${c2}">✕</span>
+              </div>`;
+        });
+        node.innerHTML = `
+          <div class="l1">
+            <span>${c1}</span>
+            <button class="chip-add" data-act="add2" data-c1="${c1}">+ sub</button>
+            <span class="mini-x" data-act="del1" data-c1="${c1}" style="margin-left:auto">✕</span>
+          </div>
+          <div class="cat-children">${childrenHtml || '<span style="color:var(--muted);font-size:.8rem">No sub-categories</span>'}</div>`;
+        mgr.appendChild(node);
+    });
+}
+
+mgr.addEventListener('click', (e) => {
+    const el = e.target.closest('[data-act]');
+    if (!el) return;
+    const {act, c1, c2, c3} = el.dataset;
+    if (act === 'del1') { if (confirm(`Delete "${c1}" and all its sub-categories?`)) delete TREE[c1]; }
+    if (act === 'del2') delete TREE[c1][c2];
+    if (act === 'del3') TREE[c1][c2] = TREE[c1][c2].filter(x => x !== c3);
+    if (act === 'add2') { const n = prompt('New sub-category under ' + c1); if (n) TREE[c1][n] = TREE[c1][n] || []; }
+    if (act === 'add3') { const n = prompt(`New sub-sub under ${c1} › ${c2}`); if (n && !TREE[c1][c2].includes(n)) TREE[c1][c2].push(n); }
+    render();
+});
+
+document.getElementById('add-l1').addEventListener('click', () => {
+    const n = prompt('New top-level category');
+    if (n && !TREE[n]) { TREE[n] = {}; render(); }
+});
+
+function toast(msg, ok=true) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.style.background = ok ? '' : 'linear-gradient(135deg,#ec4899,#ef4444)';
+    t.classList.remove('hidden');
+    setTimeout(() => t.classList.add('hidden'), 3000);
+}
+
+document.getElementById('save-cats').addEventListener('click', async () => {
+    const body = new FormData();
+    body.append('hierarchy', JSON.stringify(TREE));
+    try {
+        const res = await fetch('{{ url_for("save_categories") }}', { method: 'POST', body });
+        const data = await res.json();
+        toast(data.success ? 'Category tree saved ✓' : 'Save failed', data.success);
+    } catch (err) { toast('Save failed', false); }
+});
+
+render();
+</script>
+{% endblock %}

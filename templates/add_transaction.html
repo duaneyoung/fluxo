@@ -1,0 +1,232 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if tx else 'Add' }} Transaction{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div style="display:flex;align-items:center;gap:.9rem">
+        <a href="{{ url_for('transactions_view') }}" class="icon-btn" title="Back">←</a>
+        <div>
+            <h1>{{ 'Edit' if tx else 'Add a' }} Transaction</h1>
+            <div class="sub">{{ 'Update the details below' if tx else 'Log a new inflow or outflow' }}</div>
+        </div>
+    </div>
+</div>
+
+{% if not tx %}
+<div class="tabs">
+    <div class="tab active" data-tab="manual">Add Manually</div>
+    <div class="tab" data-tab="upload">Upload File</div>
+</div>
+{% endif %}
+
+<!-- ===== MANUAL ===== -->
+<div class="tab-pane active" id="pane-manual">
+<form method="post"
+      action="{% if tx %}{{ url_for('edit_transaction', tx_id=tx.id) }}{% else %}{{ url_for('add_transaction') }}{% endif %}"
+      class="glass panel" id="tx-form">
+    <div class="form-grid">
+        <!-- Calendar -->
+        <div class="fg">
+            <label>Date</label>
+            <div class="calendar" id="calendar"></div>
+            <input type="hidden" name="date" id="date-input" value="{{ tx.date if tx else '' }}">
+        </div>
+
+        <div>
+            <!-- Amount -->
+            <div class="fg" style="margin-bottom:1.1rem">
+                <label>Amount</label>
+                <input type="number" step="0.01" min="0" name="amount" required
+                       value="{{ tx.amount if tx else '' }}" placeholder="0.00">
+            </div>
+            <!-- Type -->
+            <div class="fg" style="margin-bottom:1.1rem">
+                <label>Transaction type</label>
+                <div class="radio-row">
+                    <label><input type="radio" name="transaction_type" value="outflow"
+                        {% if not tx or tx.transaction_type=='outflow' %}checked{% endif %}><span>Outflow</span></label>
+                    <label><input type="radio" name="transaction_type" value="inflow"
+                        {% if tx and tx.transaction_type=='inflow' %}checked{% endif %}><span>Inflow</span></label>
+                </div>
+            </div>
+            <!-- One-off -->
+            <div class="fg">
+                <label>&nbsp;</label>
+                <div class="switch-row">
+                    <span>One-off transaction</span>
+                    <label class="switch">
+                        <input type="checkbox" name="is_one_off" value="1" {% if tx and tx.is_one_off %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick categories -->
+        <div class="fg wide">
+            <label>Quick categories</label>
+            <div class="quick-grid">
+                {% for q in quick_categories %}
+                <button type="button" class="quick-btn" data-path='{{ q.path|tojson }}'>
+                    <span class="q-ico">{{ q.icon }}</span>{{ q.label }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Cascading categories -->
+        <div class="fg">
+            <label>Category 1</label>
+            <select name="category_1" id="cat1"></select>
+        </div>
+        <div class="fg">
+            <label>Category 2</label>
+            <select name="category_2" id="cat2"></select>
+        </div>
+        <div class="fg">
+            <label>Category 3</label>
+            <select name="category_3" id="cat3"></select>
+        </div>
+
+        <!-- Method -->
+        <div class="fg">
+            <label>Payment method</label>
+            <input type="text" name="method" value="{{ tx.method if tx else '' }}" placeholder="Revolut, Amex, Cash…">
+        </div>
+
+        <!-- Details -->
+        <div class="fg wide">
+            <label>Details / notes</label>
+            <textarea name="details" rows="2" placeholder="optional">{{ tx.details if tx else '' }}</textarea>
+        </div>
+
+        <div class="fg wide">
+            <button type="submit" class="btn full" id="submit-btn">{{ 'Update transaction' if tx else 'Add transaction' }}</button>
+        </div>
+    </div>
+</form>
+</div>
+
+<!-- ===== UPLOAD ===== -->
+{% if not tx %}
+<div class="tab-pane" id="pane-upload">
+<form method="post" action="{{ url_for('import_transactions') }}" enctype="multipart/form-data" class="glass panel">
+    <h3 style="margin-bottom:.4rem">Bulk import from CSV</h3>
+    <p style="color:var(--muted);font-size:.86rem;margin-bottom:1.1rem">
+        Upload a MoneyBlox-format CSV (Date, Type, Amount, Category 1/2/3, Method, Details, Is One Off).
+        Dates in <code>M/D/YYYY</code> or <code>YYYY-MM-DD</code> are both accepted.
+    </p>
+    <div class="fg" style="margin-bottom:1.1rem">
+        <input type="file" name="file" accept=".csv" required
+               style="padding:.9rem;border-style:dashed">
+    </div>
+    <button type="submit" class="btn full">Import transactions</button>
+</form>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+const HIERARCHY = {{ hierarchy|tojson }};
+const EDIT = {{ {'c1': tx.category_1, 'c2': tx.category_2, 'c3': tx.category_3}|tojson if tx else 'null' }};
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll('.tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById('pane-' + tab.dataset.tab).classList.add('active');
+    });
+});
+
+/* ---------- Cascading category selects ---------- */
+const cat1 = document.getElementById('cat1');
+const cat2 = document.getElementById('cat2');
+const cat3 = document.getElementById('cat3');
+
+function opts(select, values, selected) {
+    select.innerHTML = '<option value="">—</option>';
+    values.forEach(v => {
+        const o = document.createElement('option');
+        o.value = v; o.textContent = v;
+        if (v === selected) o.selected = true;
+        select.appendChild(o);
+    });
+}
+
+function fillCat1(sel) { opts(cat1, Object.keys(HIERARCHY), sel); }
+function fillCat2(c1, sel) {
+    const children = (HIERARCHY[c1] && Object.keys(HIERARCHY[c1])) || [];
+    opts(cat2, children, sel);
+}
+function fillCat3(c1, c2, sel) {
+    const leaves = (HIERARCHY[c1] && HIERARCHY[c1][c2]) || [];
+    opts(cat3, leaves, sel);
+}
+
+cat1.addEventListener('change', () => { fillCat2(cat1.value, ''); fillCat3(cat1.value, '', ''); });
+cat2.addEventListener('change', () => { fillCat3(cat1.value, cat2.value, ''); });
+
+/* init */
+fillCat1(EDIT ? EDIT.c1 : '');
+if (EDIT) { fillCat2(EDIT.c1, EDIT.c2); fillCat3(EDIT.c1, EDIT.c2, EDIT.c3); }
+else { fillCat2('', ''); fillCat3('', '', ''); }
+
+/* ---------- Quick categories ---------- */
+document.querySelectorAll('.quick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const [c1, c2, c3] = JSON.parse(btn.dataset.path);
+        fillCat1(c1); fillCat2(c1, c2); fillCat3(c1, c2, c3);
+        // set outflow by default for spend quick-categories
+        const out = document.querySelector('input[name=transaction_type][value=outflow]');
+        if (out) out.checked = true;
+    });
+});
+
+/* ---------- Inline calendar ---------- */
+const dateInput = document.getElementById('date-input');
+const calEl = document.getElementById('calendar');
+const DOW = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+let selected = dateInput.value ? new Date(dateInput.value + 'T00:00:00') : new Date();
+let viewYear = selected.getFullYear();
+let viewMonth = selected.getMonth();
+const initiallyHadValue = !!dateInput.value;
+if (!initiallyHadValue) setDate(new Date()); // default to today
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function setDate(d) {
+    selected = d;
+    dateInput.value = d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+    renderCal();
+}
+function renderCal() {
+    const today = new Date();
+    const first = new Date(viewYear, viewMonth, 1).getDay();
+    const days = new Date(viewYear, viewMonth+1, 0).getDate();
+    let html = `<div class="cal-head">
+        <button type="button" class="cal-nav" id="cal-prev">‹</button>
+        <span class="m">${MONTHS[viewMonth]} ${viewYear}</span>
+        <button type="button" class="cal-nav" id="cal-next">›</button>
+      </div><div class="cal-grid">`;
+    DOW.forEach(d => html += `<div class="cal-dow">${d}</div>`);
+    for (let i=0;i<first;i++) html += `<div class="cal-day empty"></div>`;
+    for (let d=1; d<=days; d++) {
+        const isSel = selected && selected.getFullYear()===viewYear && selected.getMonth()===viewMonth && selected.getDate()===d;
+        const isToday = today.getFullYear()===viewYear && today.getMonth()===viewMonth && today.getDate()===d;
+        html += `<div class="cal-day ${isSel?'sel':''} ${isToday?'today':''}" data-day="${d}">${d}</div>`;
+    }
+    html += `</div>`;
+    calEl.innerHTML = html;
+    document.getElementById('cal-prev').onclick = () => { viewMonth--; if(viewMonth<0){viewMonth=11;viewYear--;} renderCal(); };
+    document.getElementById('cal-next').onclick = () => { viewMonth++; if(viewMonth>11){viewMonth=0;viewYear++;} renderCal(); };
+    calEl.querySelectorAll('.cal-day:not(.empty)').forEach(el => {
+        el.onclick = () => setDate(new Date(viewYear, viewMonth, parseInt(el.dataset.day)));
+    });
+}
+renderCal();
+</script>
+{% endblock %}
