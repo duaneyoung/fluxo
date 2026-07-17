@@ -90,12 +90,16 @@ def transactions_view():
     txs = db.get_transactions(search, category_1, date_from, date_to)
     inflow = sum(t['amount'] for t in txs if t['transaction_type'] == 'inflow')
     outflow = sum(t['amount'] for t in txs if t['transaction_type'] == 'outflow')
+    investments = sum(t['amount'] for t in txs
+                      if t['transaction_type'] == 'outflow'
+                      and t['category_1'] == 'Investments')
 
     return render_template(
         'transactions.html',
         transactions=txs,
         summary={'inflow': inflow, 'outflow': outflow,
-                 'net': inflow - outflow, 'count': len(txs)},
+                 'net': inflow - outflow, 'count': len(txs),
+                 'investments': investments},
         filters={'search': search, 'category_1': category_1,
                  'date_from': date_from, 'date_to': date_to},
     )

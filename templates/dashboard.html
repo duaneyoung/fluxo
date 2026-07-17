@@ -23,7 +23,7 @@
         <input type="checkbox" name="exclude_one_off" value="1" onchange="this.form.submit()"
                {% if filters.exclude_one_off %}checked{% endif %}> Exclude one-offs
     </label>
-    <div style="margin-left:auto;min-width:170px">
+    <div style="margin-left:auto">
         <select name="timeframe" onchange="this.form.submit()">
             <option value="this_month" {% if filters.timeframe=='this_month' %}selected{% endif %}>This month</option>
             <option value="last_month" {% if filters.timeframe=='last_month' %}selected{% endif %}>Last month</option>
@@ -71,6 +71,9 @@
     <div class="chart-box"><canvas id="spendChart"></canvas></div>
 
     <div class="month-picker" id="month-picker">
+        <span class="month-opt toggle-all" id="toggle-all-months">
+            {% if selected_compare|length >= months|length %}Deselect all{% else %}Select all{% endif %}
+        </span>
         {% for m in months %}
         <span class="month-opt {% if m in selected_compare %}sel{% endif %}" data-month="{{ m }}">{{ m }}</span>
         {% endfor %}
@@ -106,7 +109,7 @@
                         <td style="color:var(--muted);font-size:.8rem">{{ t.date }}</td>
                         <td>{{ t.category_1 }}{% if t.category_2 %} <span style="color:var(--muted)">› {{ t.category_2 }}</span>{% endif %}</td>
                         <td class="num {% if t.transaction_type=='inflow' %}pos{% endif %}">
-                            {% if t.transaction_type=='inflow' %}+{% else %}−{% endif %}{{ currency_symbol }}{{ t.amount|money }}
+                            <span class="amt">{% if t.transaction_type=='inflow' %}+{% else %}−{% endif %}{{ currency_symbol }}{{ t.amount|money }}</span>
                         </td>
                     </tr>
                     {% endfor %}
@@ -160,17 +163,30 @@ new Chart(document.getElementById('spendChart'), {
 });
 
 // Month picker -> toggle compare params and reload
-document.getElementById('month-picker').addEventListener('click', (e) => {
-    const opt = e.target.closest('.month-opt');
-    if (!opt) return;
+const ALL_MONTHS = [...document.querySelectorAll('.month-opt[data-month]')].map(el => el.dataset.month);
+
+function setCompare(months) {
     const url = new URL(window.location.href);
-    const month = opt.dataset.month;
-    let compare = url.searchParams.getAll('compare');
     url.searchParams.delete('compare');
+    months.forEach(m => url.searchParams.append('compare', m));
+    window.location.href = url.toString();
+}
+
+document.getElementById('month-picker').addEventListener('click', (e) => {
+    if (e.target.closest('#toggle-all-months')) {
+        const selectedNow = document.querySelectorAll('.month-opt.sel').length;
+        // Select all; if everything is already selected, collapse back to current month only
+        setCompare(selectedNow >= ALL_MONTHS.length ? [ALL_MONTHS[0]] : ALL_MONTHS);
+        return;
+    }
+    const opt = e.target.closest('.month-opt[data-month]');
+    if (!opt) return;
+    const month = opt.dataset.month;
+    let compare = new URL(window.location.href).searchParams.getAll('compare');
+    if (!compare.length) compare = [...document.querySelectorAll('.month-opt.sel')].map(el => el.dataset.month);
     if (compare.includes(month)) compare = compare.filter(m => m !== month);
     else compare.push(month);
-    compare.forEach(m => url.searchParams.append('compare', m));
-    window.location.href = url.toString();
+    setCompare(compare);
 });
 </script>
 {% endblock %}

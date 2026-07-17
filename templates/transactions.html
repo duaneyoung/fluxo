@@ -27,8 +27,8 @@
         <div class="val {% if summary.net >= 0 %}pos{% else %}neg{% endif %}">{{ currency_symbol }}{{ summary.net|money }}</div>
     </div>
     <div class="metric glass">
-        <div class="lbl"><span class="dot" style="background:var(--violet)"></span>Count</div>
-        <div class="val">{{ summary.count }}</div>
+        <div class="lbl"><span class="dot" style="background:var(--violet)"></span>Investments</div>
+        <div class="val">{{ currency_symbol }}{{ summary.investments|money }}</div>
     </div>
 </div>
 
@@ -84,7 +84,7 @@
                     <td>{{ t.method }}</td>
                     <td style="color:var(--muted)">{{ t.details }}</td>
                     <td class="num {% if t.transaction_type=='inflow' %}pos{% endif %}">
-                        {% if t.transaction_type=='inflow' %}+{% else %}−{% endif %}{{ currency_symbol }}{{ t.amount|money }}
+                        <span class="amt">{% if t.transaction_type=='inflow' %}+{% else %}−{% endif %}{{ currency_symbol }}{{ t.amount|money }}</span>
                     </td>
                     <td>
                         <div class="row-actions">

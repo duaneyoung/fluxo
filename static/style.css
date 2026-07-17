@@ -106,12 +106,16 @@ h3{font-size:1.05rem;font-weight:600}
 .btn.err{background:var(--grad-accent)}
 
 /* ---------- CONTROLS BAR ---------- */
-.controls{display:flex;gap:.8rem;align-items:center;flex-wrap:wrap;padding:1rem 1.2rem;margin-bottom:1.4rem}
-.toggle-chip{display:inline-flex;align-items:center;gap:.5rem;font-size:.82rem;color:var(--muted);
-  padding:.5rem .85rem;border-radius:999px;background:rgba(255,255,255,.05);
-  border:1px solid var(--glass-brd);cursor:pointer;transition:.15s}
-.toggle-chip input{accent-color:var(--indigo)}
-.toggle-chip.on{color:#fff;background:rgba(124,92,255,.22);border-color:rgba(124,92,255,.5)}
+.controls{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;padding:.65rem .8rem;margin-bottom:1.4rem}
+.controls select{width:auto;padding:.42rem 1.8rem .42rem .8rem;font-size:.78rem;border-radius:999px}
+.toggle-chip{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:500;
+  color:var(--muted);padding:.42rem .85rem;border-radius:999px;background:rgba(255,255,255,.05);
+  border:1px solid var(--glass-brd);cursor:pointer;transition:.15s;user-select:none;white-space:nowrap}
+.toggle-chip:hover{background:rgba(255,255,255,.09)}
+.toggle-chip input{display:none}
+.toggle-chip.on{color:#fff;background:linear-gradient(135deg,rgba(79,70,229,.55),rgba(124,58,237,.55));
+  border-color:rgba(124,92,255,.6);box-shadow:0 2px 10px rgba(79,70,229,.3)}
+.toggle-chip.on::before{content:'✓';font-size:.7rem}
 select,input[type=text],input[type=number],input[type=date],input[type=search],textarea{
   font-family:inherit;background:rgba(255,255,255,.05);border:1px solid var(--glass-brd);
   color:var(--text);border-radius:10px;padding:.6rem .8rem;font-size:.9rem;outline:none;width:100%;
@@ -130,8 +134,13 @@ label{font-size:.8rem;color:var(--muted);display:block;margin-bottom:.35rem}
 .chart-box{position:relative;height:320px}
 .month-picker{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.9rem}
 .month-opt{font-size:.75rem;padding:.35rem .7rem;border-radius:999px;cursor:pointer;
-  background:rgba(255,255,255,.05);border:1px solid var(--glass-brd);color:var(--muted)}
+  background:rgba(255,255,255,.05);border:1px solid var(--glass-brd);color:var(--muted);user-select:none}
 .month-opt.sel{background:rgba(124,92,255,.22);border-color:rgba(124,92,255,.5);color:#fff}
+.month-opt.toggle-all{border-style:dashed;color:var(--violet);font-weight:600}
+.month-opt.toggle-all:hover{background:rgba(124,92,255,.15)}
+
+/* keep sign + currency + amount on one line */
+.amt{white-space:nowrap}
 
 /* ---------- GRID SPLIT ---------- */
 .split{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.4rem}
@@ -243,8 +252,16 @@ tbody tr:hover{background:rgba(255,255,255,.03)}
   .split{grid-template-columns:1fr}
 }
 @media(max-width:760px){
-  .mobile-bar{display:flex;align-items:center;gap:.8rem;position:sticky;top:0;z-index:30;
-    padding:.9rem 1.1rem;background:var(--sidebar);border-bottom:1px solid rgba(255,255,255,.06)}
+  /* Fixed glass header (like CardVault): pinned to viewport, pushed below the
+     notch via safe-area inset, stays frozen while content scrolls under it. */
+  .mobile-bar{display:flex;align-items:center;gap:.8rem;
+    position:fixed;top:0;left:0;right:0;z-index:30;
+    padding:.85rem 1.1rem;
+    padding-top:calc(.85rem + env(safe-area-inset-top));
+    background:rgba(13,19,33,.6);
+    backdrop-filter:blur(22px) saturate(180%);
+    -webkit-backdrop-filter:blur(22px) saturate(180%);
+    border-bottom:1px solid rgba(255,255,255,.08)}
   .hamburger{background:none;border:none;color:var(--text);font-size:1.4rem;cursor:pointer}
   .mobile-brand{font-weight:700;display:flex;align-items:center;gap:.5rem}
   .mobile-brand .logo-mark{width:28px;height:28px;font-size:.85rem}
@@ -253,10 +270,21 @@ tbody tr:hover{background:rgba(255,255,255,.03)}
     transition:.25s;z-index:40;width:260px}
   body.nav-open .sidebar{transform:translateX(0)}
   body.nav-open .nav-scrim{display:block;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:35}
-  .content{padding:1.3rem 1.1rem}
+  .content{padding:1.3rem 1.1rem;
+    padding-top:calc(4.6rem + env(safe-area-inset-top))}
   .form-grid{grid-template-columns:1fr}
   .quick-grid{grid-template-columns:repeat(3,1fr)}
   h1{font-size:1.6rem}
+
+  /* Transactions filter bar: stack cleanly, no overlapping buttons */
+  .filter-bar{flex-direction:column;align-items:stretch;gap:.7rem}
+  .filter-bar .fg{min-width:0;width:100%}
+  .filter-bar .btn{width:100%;justify-content:center}
+
+  /* Dashboard controls: chips scroll in a row, timeframe below full-width */
+  .controls{gap:.45rem;padding:.6rem .7rem}
+  .controls > div[style]{margin-left:0 !important;width:100%}
+  .controls select{width:100%}
 }
 @media(max-width:460px){
   .metrics{grid-template-columns:1fr}
