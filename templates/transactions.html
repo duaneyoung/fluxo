@@ -105,6 +105,17 @@
     {% endif %}
 </div>
 
+{% if truncated %}
+<div style="text-align:center;margin-top:1rem">
+    <a class="btn ghost" href="{{ url_for('transactions_view', all=1, **filters) }}">
+        Show all {{ total }} transactions
+    </a>
+    <div style="color:var(--muted);font-size:.78rem;margin-top:.4rem">
+        Showing latest {{ transactions|length }} — totals above cover everything
+    </div>
+</div>
+{% endif %}
+
 {% if request.args.get('imported') %}
 <div class="toast" id="toast">Imported {{ request.args.get('imported') }} transactions ✓</div>
 <script>setTimeout(()=>document.getElementById('toast').remove(),3500)</script>

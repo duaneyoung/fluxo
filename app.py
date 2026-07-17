@@ -12,6 +12,13 @@ from flask import (Flask, render_template, request, jsonify, redirect,
 import db
 
 app = Flask(__name__)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600  # cache static assets 1h
+
+try:
+    from flask_compress import Compress
+    Compress(app)  # gzip HTML/JSON — the transactions table shrinks ~10x
+except ImportError:
+    pass  # local dev without the dependency still works
 
 
 # --- TEMPLATE HELPERS ---
@@ -95,11 +102,21 @@ def transactions_view():
                       if t['transaction_type'] == 'outflow'
                       and t['category_1'] == 'Investments')
 
+    # Render the latest N rows by default; "Show all" lifts the cap.
+    # (Stats above are always computed over the full filtered set.)
+    total = len(txs)
+    show_all = request.args.get('all') == '1'
+    limit = 300
+    truncated = not show_all and total > limit
+    visible = txs if show_all else txs[:limit]
+
     return render_template(
         'transactions.html',
-        transactions=txs,
+        transactions=visible,
+        total=total,
+        truncated=truncated,
         summary={'inflow': inflow, 'outflow': outflow,
-                 'net': inflow - outflow, 'count': len(txs),
+                 'net': inflow - outflow, 'count': total,
                  'investments': investments},
         filters={'search': search, 'category_1': category_1,
                  'date_from': date_from, 'date_to': date_to},
@@ -235,6 +252,12 @@ def save_categories():
         return jsonify({'success': False, 'error': 'Invalid category data'}), 400
     db.update_settings(hierarchy=hierarchy)
     return jsonify({'success': True})
+
+
+@app.route('/health')
+def health():
+    """Cheap keep-alive target — no DB, no templates."""
+    return 'ok', 200
 
 
 @app.route('/manifest.json')

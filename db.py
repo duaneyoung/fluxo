@@ -283,42 +283,52 @@ def _row_to_tx(r):
     }
 
 
-def get_transactions(search='', category_1='', date_from='', date_to=''):
-    if DEMO:
-        _ensure_seed()
-        txs = sorted(_demo_txs, key=lambda t: (t['date'], t['id']), reverse=True)
-        txs = [dict(t) for t in txs]
-        if category_1:
-            txs = [t for t in txs if t['category_1'] == category_1]
-        if date_from:
-            txs = [t for t in txs if t['date'] >= date_from]
-        if date_to:
-            txs = [t for t in txs if t['date'] <= date_to]
-        if search:
-            s = search.lower()
-            txs = [t for t in txs if s in ' '.join([
-                t['category_1'], t['category_2'], t['category_3'],
-                t['method'], t['details']]).lower()]
-        return txs
+_tx_cache = {'data': None, 'at': 0.0}
+_TX_TTL = 60  # seconds; invalidated on any write
+
+
+def _invalidate_tx_cache():
+    _tx_cache.update(data=None, at=0.0)
+
+
+def _fetch_all_transactions():
+    """Full transaction list, newest first — cached in memory for _TX_TTL."""
+    import time as _time
+    if _tx_cache['data'] is not None and _time.time() - _tx_cache['at'] < _TX_TTL:
+        return _tx_cache['data']
+
     client = get_client()
     # PostgREST caps each request at 1000 rows, so paginate through all.
     page, offset, rows = 1000, 0, []
     while True:
-        q = client.table('transactions').select('*')
-        if category_1:
-            q = q.eq('category_1', category_1)
-        if date_from:
-            q = q.gte('date', date_from)
-        if date_to:
-            q = q.lte('date', date_to)
-        chunk = (q.order('date', desc=True).order('id', desc=True)
-                  .range(offset, offset + page - 1).execute().data)
+        chunk = (client.table('transactions').select('*')
+                 .order('date', desc=True).order('id', desc=True)
+                 .range(offset, offset + page - 1).execute().data)
         rows.extend(chunk)
         if len(chunk) < page:
             break
         offset += page
     txs = [_row_to_tx(r) for r in rows]
+    _tx_cache.update(data=txs, at=_time.time())
+    return txs
 
+
+def get_transactions(search='', category_1='', date_from='', date_to=''):
+    if DEMO:
+        _ensure_seed()
+        txs = sorted(_demo_txs, key=lambda t: (t['date'], t['id']), reverse=True)
+        txs = [dict(t) for t in txs]
+    else:
+        # Filters run in Python over the cached list (trivial at this scale)
+        # so most page loads make zero Supabase round trips.
+        txs = list(_fetch_all_transactions())
+
+    if category_1:
+        txs = [t for t in txs if t['category_1'] == category_1]
+    if date_from:
+        txs = [t for t in txs if t['date'] >= date_from]
+    if date_to:
+        txs = [t for t in txs if t['date'] <= date_to]
     if search:
         s = search.lower()
         txs = [t for t in txs if s in ' '.join([
@@ -363,6 +373,7 @@ def _row_demo_normalize(row):
 
 
 def add_transaction(form):
+    _invalidate_tx_cache()
     if DEMO:
         _ensure_seed()
         _demo_seq['id'] += 1
@@ -373,6 +384,7 @@ def add_transaction(form):
 
 
 def edit_transaction(tx_id, form):
+    _invalidate_tx_cache()
     if DEMO:
         _ensure_seed()
         for i, t in enumerate(_demo_txs):
@@ -384,6 +396,7 @@ def edit_transaction(tx_id, form):
 
 
 def delete_transaction(tx_id):
+    _invalidate_tx_cache()
     if DEMO:
         _ensure_seed()
         _demo_txs[:] = [t for t in _demo_txs if t['id'] != int(tx_id)]
@@ -393,6 +406,7 @@ def delete_transaction(tx_id):
 
 def import_transactions(rows):
     """Bulk insert. rows = list of dicts (already normalized). Returns count."""
+    _invalidate_tx_cache()
     payload = []
     for r in rows:
         iso = parse_date(r.get('date'))

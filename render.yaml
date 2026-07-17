@@ -6,7 +6,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn -w 2 --threads 4 app:app
     envVars:
       - key: SUPABASE_URL
         sync: false   # set this in the Render dashboard (secret)
