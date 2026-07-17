@@ -57,6 +57,19 @@
         <main class="content">
             {% block content %}{% endblock %}
         </main>
+
+        <!-- Floating bottom pill nav (mobile) -->
+        <nav class="bottom-nav">
+            <a href="{{ url_for('dashboard') }}" class="bn-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                <span class="bn-ico">📊</span><span class="bn-label">Dashboard</span>
+            </a>
+            <a href="{{ url_for('transactions_view') }}" class="bn-link {% if request.endpoint in ['transactions_view', 'add_transaction_view', 'edit_transaction_view'] %}active{% endif %}">
+                <span class="bn-ico">📋</span><span class="bn-label">Transactions</span>
+            </a>
+            <a href="{{ url_for('settings_view') }}" class="bn-link {% if request.endpoint == 'settings_view' %}active{% endif %}">
+                <span class="bn-ico">⚙️</span><span class="bn-label">Settings</span>
+            </a>
+        </nav>
     </div>
     {% block scripts %}{% endblock %}
 </body>
