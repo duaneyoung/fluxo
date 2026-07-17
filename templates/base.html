@@ -10,6 +10,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0e1020">
+    <!-- Home-screen / PWA icons -->
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Fluxo">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 </head>
 <body>
