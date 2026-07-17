@@ -287,14 +287,22 @@ def get_transactions(search='', category_1='', date_from='', date_to=''):
                 t['method'], t['details']]).lower()]
         return txs
     client = get_client()
-    q = client.table('transactions').select('*')
-    if category_1:
-        q = q.eq('category_1', category_1)
-    if date_from:
-        q = q.gte('date', date_from)
-    if date_to:
-        q = q.lte('date', date_to)
-    rows = q.order('date', desc=True).order('id', desc=True).execute().data
+    # PostgREST caps each request at 1000 rows, so paginate through all.
+    page, offset, rows = 1000, 0, []
+    while True:
+        q = client.table('transactions').select('*')
+        if category_1:
+            q = q.eq('category_1', category_1)
+        if date_from:
+            q = q.gte('date', date_from)
+        if date_to:
+            q = q.lte('date', date_to)
+        chunk = (q.order('date', desc=True).order('id', desc=True)
+                  .range(offset, offset + page - 1).execute().data)
+        rows.extend(chunk)
+        if len(chunk) < page:
+            break
+        offset += page
     txs = [_row_to_tx(r) for r in rows]
 
     if search:
