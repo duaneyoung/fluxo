@@ -89,25 +89,17 @@
             <div class="sub" style="color:var(--muted);font-size:.85rem">Monthly totals since the beginning · changes measured on {{ trends.ref_label }}</div>
         </div>
     </div>
-    <div class="trend-cards">
+    <div class="delta-strip">
         {% for key, label, color in [('income','Income','var(--green)'), ('expenses','Expenses','var(--red)'), ('investments','Investments','#fbbf24')] %}
-        <div class="trend-card" style="border-left-color:{{ color }}">
-            <div class="tc-head"><span class="dot" style="background:{{ color }}"></span>{{ label }}</div>
-            <div class="tc-vals">
-                <div><div class="tc-label">Month to date</div>
-                     <div class="tc-money">{{ currency_symbol }}{{ trends.mtd[key]|money }}</div></div>
-                <div><div class="tc-label">Year to date</div>
-                     <div class="tc-money">{{ currency_symbol }}{{ trends.ytd[key]|money }}</div></div>
-            </div>
-            <div class="tc-deltas">
-                {% for period, plabel in [('mom','MoM'),('yoy','YoY')] %}
-                {% set v = trends.deltas[key][period] %}
-                <span class="tc-chip {% if v is not none %}{{ 'pos' if v >= 0 else 'neg' }}{% endif %}">
-                    <span class="tc-chip-label">{{ plabel }}</span>
-                    {% if v is none %}—{% else %}{{ '▲' if v >= 0 else '▼' }} {{ v|abs }}%{% endif %}
-                </span>
-                {% endfor %}
-            </div>
+        <div class="delta-group">
+            <span class="dot" style="background:{{ color }}"></span>
+            <span class="delta-name">{{ label }}</span>
+            {% for period, plabel in [('mom','MoM'),('yoy','YoY')] %}
+            {% set v = trends.deltas[key][period] %}
+            <span class="delta-bubble {% if v is not none %}{{ 'pos' if v >= 0 else 'neg' }}{% endif %}">
+                {{ plabel }} {% if v is none %}—{% else %}{{ '▲' if v >= 0 else '▼' }}{{ v|abs }}%{% endif %}
+            </span>
+            {% endfor %}
         </div>
         {% endfor %}
     </div>
