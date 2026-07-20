@@ -212,6 +212,41 @@ def import_transactions():
     return redirect(url_for('transactions_view', imported=count))
 
 
+@app.route('/transactions/import-revolut', methods=['POST'])
+def import_revolut():
+    """Parse a raw Revolut export and show the editable preview."""
+    import revolut
+    file = request.files.get('file')
+    if not file:
+        return redirect(url_for('add_transaction_view'))
+    try:
+        rows = revolut.parse_export(file.read(), file.filename)
+    except ValueError as exc:
+        return render_template('revolut_preview.html', rows_json='[]',
+                               error=str(exc))
+    return render_template('revolut_preview.html',
+                           rows_json=json.dumps(rows), error=None)
+
+
+@app.route('/transactions/import-revolut/confirm', methods=['POST'])
+def import_revolut_confirm():
+    """Insert the (user-edited) preview rows."""
+    rows = request.get_json(silent=True) or []
+    payload = [{
+        'date': r.get('date'),
+        'transaction_type': r.get('transaction_type', 'outflow'),
+        'amount': r.get('amount'),
+        'category_1': r.get('category_1'),
+        'category_2': r.get('category_2'),
+        'category_3': r.get('category_3'),
+        'method': 'Revolut',
+        'details': r.get('details', ''),
+        'is_one_off': '',
+    } for r in rows]
+    count = db.import_transactions(payload)
+    return jsonify({'imported': count})
+
+
 @app.route('/transactions/export')
 def export_csv():
     txs = db.get_transactions()

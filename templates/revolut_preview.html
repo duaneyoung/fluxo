@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Revolut Import{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div style="display:flex;align-items:center;gap:.9rem">
+        <a href="{{ url_for('add_transaction_view') }}" class="icon-btn" title="Back">←</a>
+        <div>
+            <h1>Review Revolut import</h1>
+            <div class="sub">Edit categories, untick or remove rows — nothing is saved until you confirm</div>
+        </div>
+    </div>
+</div>
+
+{% if error %}
+<div class="glass panel"><div class="empty"><div class="big">⚠️</div>{{ error }}</div></div>
+{% else %}
+<div class="glass" style="padding:.6rem 1rem">
+    <div class="table-wrap">
+        <table id="prev-table">
+            <thead>
+                <tr>
+                    <th></th><th>Date</th><th>Merchant</th><th>Type</th>
+                    <th class="num">Amount</th>
+                    <th>Category 1</th><th>Category 2</th><th>Category 3</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody id="prev-body"></tbody>
+        </table>
+    </div>
+</div>
+
+<div style="display:flex;align-items:center;gap:1rem;margin-top:1.1rem;flex-wrap:wrap">
+    <button class="btn" id="confirm-btn">Import selected</button>
+    <span style="color:var(--muted);font-size:.85rem" id="count-label"></span>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if not error %}
+<script>
+const ROWS = {{ rows_json|safe }};
+const HIERARCHY = {{ hierarchy|tojson }};
+const body = document.getElementById('prev-body');
+
+function opts(values, selected) {
+    return ['<option value="">—</option>']
+        .concat(values.map(v => `<option value="${v}" ${v===selected?'selected':''}>${v}</option>`))
+        .join('');
+}
+
+function render() {
+    body.innerHTML = ROWS.map((r, i) => {
+        const c2s = (HIERARCHY[r.category_1] && Object.keys(HIERARCHY[r.category_1])) || [];
+        const c3s = (HIERARCHY[r.category_1] && HIERARCHY[r.category_1][r.category_2]) || [];
+        return `<tr data-i="${i}" style="${r.include?'':'opacity:.45'}">
+            <td><input type="checkbox" data-f="include" ${r.include?'checked':''}
+                 title="${r.note||''}"></td>
+            <td><input type="date" data-f="date" value="${r.date}" style="width:140px"></td>
+            <td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+                title="${r.merchant}">${r.merchant}
+                ${r.note?`<div style="font-size:.68rem;color:var(--pink)">${r.note}</div>`:''}</td>
+            <td><select data-f="transaction_type" style="width:100px">
+                <option value="outflow" ${r.transaction_type==='outflow'?'selected':''}>outflow</option>
+                <option value="inflow" ${r.transaction_type==='inflow'?'selected':''}>inflow</option>
+            </select></td>
+            <td><input type="number" step="0.01" min="0" data-f="amount" value="${r.amount}"
+                 style="width:100px" class="num"></td>
+            <td><select data-f="category_1" style="width:140px">${opts(Object.keys(HIERARCHY), r.category_1)}</select></td>
+            <td><select data-f="category_2" style="width:130px">${opts(c2s, r.category_2)}</select></td>
+            <td><select data-f="category_3" style="width:120px">${opts(c3s, r.category_3)}</select></td>
+            <td><button class="icon-btn danger" data-f="remove" title="Remove row">🗑</button></td>
+        </tr>`;
+    }).join('');
+    updateCount();
+}
+
+function updateCount() {
+    const n = ROWS.filter(r => r.include).length;
+    document.getElementById('count-label').textContent =
+        `${n} of ${ROWS.length} rows will be imported`;
+}
+
+body.addEventListener('input', (e) => {
+    const f = e.target.dataset.f;
+    if (!f) return;
+    const i = +e.target.closest('tr').dataset.i;
+    if (f === 'include') {
+        ROWS[i].include = e.target.checked;
+        e.target.closest('tr').style.opacity = e.target.checked ? '' : '.45';
+        updateCount();
+    } else if (f === 'amount') {
+        ROWS[i].amount = parseFloat(e.target.value) || 0;
+    } else if (f === 'category_1') {
+        ROWS[i].category_1 = e.target.value;
+        ROWS[i].category_2 = ''; ROWS[i].category_3 = '';
+        render();
+    } else if (f === 'category_2') {
+        ROWS[i].category_2 = e.target.value;
+        ROWS[i].category_3 = '';
+        render();
+    } else {
+        ROWS[i][f] = e.target.value;
+    }
+});
+
+body.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-f="remove"]');
+    if (!btn) return;
+    ROWS.splice(+btn.closest('tr').dataset.i, 1);
+    render();
+});
+
+document.getElementById('confirm-btn').addEventListener('click', async () => {
+    const btn = document.getElementById('confirm-btn');
+    const selected = ROWS.filter(r => r.include && r.date && r.amount > 0 && r.category_1);
+    if (!selected.length) { alert('No valid rows selected (each needs date, amount, category).'); return; }
+    btn.disabled = true; btn.textContent = 'Importing…';
+    try {
+        const res = await fetch('{{ url_for("import_revolut_confirm") }}', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(selected),
+        });
+        const data = await res.json();
+        window.location.href = '{{ url_for("transactions_view") }}?imported=' + data.imported;
+    } catch (err) {
+        btn.disabled = false; btn.textContent = 'Import selected';
+        alert('Import failed — try again.');
+    }
+});
+
+render();
+</script>
+{% endif %}
+{% endblock %}

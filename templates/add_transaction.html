@@ -109,8 +109,23 @@
 <!-- ===== UPLOAD ===== -->
 {% if not tx %}
 <div class="tab-pane" id="pane-upload">
+<form method="post" action="{{ url_for('import_revolut') }}" enctype="multipart/form-data"
+      class="glass panel" style="margin-bottom:1.2rem">
+    <h3 style="margin-bottom:.4rem">Import a raw Revolut export</h3>
+    <p style="color:var(--muted);font-size:.86rem;margin-bottom:1.1rem">
+        Drop in the statement straight from the Revolut app (CSV or Excel).
+        Transactions are auto-classified — you'll get a preview to edit or
+        remove rows before anything is saved.
+    </p>
+    <div class="fg" style="margin-bottom:1.1rem">
+        <input type="file" name="file" accept=".csv,.xlsx" required
+               style="padding:.9rem;border-style:dashed">
+    </div>
+    <button type="submit" class="btn full">Preview import</button>
+</form>
+
 <form method="post" action="{{ url_for('import_transactions') }}" enctype="multipart/form-data" class="glass panel">
-    <h3 style="margin-bottom:.4rem">Bulk import from CSV</h3>
+    <h3 style="margin-bottom:.4rem">Bulk import from CSV (MoneyBlox format)</h3>
     <p style="color:var(--muted);font-size:.86rem;margin-bottom:1.1rem">
         Upload a MoneyBlox-format CSV (Date, Type, Amount, Category 1/2/3, Method, Details, Is One Off).
         Dates in <code>M/D/YYYY</code> or <code>YYYY-MM-DD</code> are both accepted.
