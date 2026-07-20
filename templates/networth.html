@@ -4,7 +4,7 @@
 <div class="page-head">
     <div>
         <h1>Net worth</h1>
-        <div class="sub">Stocks, crypto and collectibles — live valuations, refreshed every ~10 min</div>
+        <div class="sub">Financial markets, crypto and collectibles — live valuations, refreshed every ~10 min</div>
     </div>
 </div>
 
@@ -24,8 +24,8 @@
         <div class="val">{{ currency_symbol }}{{ totals.net|money }}</div>
     </div>
     <div class="metric glass">
-        <div class="lbl"><span class="dot" style="background:var(--cyan)"></span>Stocks</div>
-        <div class="val">{{ currency_symbol }}{{ totals.stocks|money }}</div>
+        <div class="lbl"><span class="dot" style="background:var(--cyan)"></span>Financial markets</div>
+        <div class="val">{{ currency_symbol }}{{ totals.markets|money }}</div>
     </div>
     <div class="metric glass">
         <div class="lbl"><span class="dot" style="background:#fbbf24"></span>Crypto</div>
@@ -35,61 +35,67 @@
         <div class="lbl"><span class="dot" style="background:var(--pink)"></span>Collectibles</div>
         <div class="val">{{ currency_symbol }}{{ totals.collectibles|money }}</div>
     </div>
-    {% if totals.warrants %}
-    <div class="metric glass">
-        <div class="lbl"><span class="dot" style="background:#60a5fa"></span>Warrants</div>
-        <div class="val">{{ currency_symbol }}{{ totals.warrants|money }}</div>
-    </div>
-    {% endif %}
-    {% if totals.other %}
-    <div class="metric glass">
-        <div class="lbl"><span class="dot" style="background:var(--muted)"></span>Other</div>
-        <div class="val">{{ currency_symbol }}{{ totals.other|money }}</div>
-    </div>
-    {% endif %}
 </div>
 
-<div class="split">
-    <!-- Stocks -->
-    <div class="panel glass">
-        <h2>Stocks</h2>
-        {% if stocks %}
-        <div class="table-wrap"><table>
-            <thead><tr><th>Symbol</th><th class="num">Shares</th><th class="num">Price</th><th class="num">Value</th><th></th></tr></thead>
-            <tbody>
-            {% for s in stocks %}
-            <tr>
-                <td class="mono" style="color:var(--cyan);font-weight:600">{{ s.label }}</td>
-                <td class="num">{{ s.quantity }}</td>
-                <td class="num">{% if s.price %}{{ currency_symbol }}{{ s.price|money }}{% else %}—{% endif %}</td>
-                <td class="num">{% if s.value %}{{ currency_symbol }}{{ s.value|money }}{% else %}—{% endif %}</td>
-                <td><form method="post" action="{{ url_for('networth_delete', asset_id=s.id) }}"
-                          onsubmit="return confirm('Remove {{ s.label }}?')" style="text-align:right">
-                    <button class="icon-btn danger">🗑</button></form></td>
-            </tr>
-            {% endfor %}
-            </tbody>
-        </table></div>
-        {% else %}<div class="empty" style="padding:1.4rem">No holdings yet.</div>{% endif %}
+<!-- Financial markets: stocks + warrants -->
+<div class="panel glass">
+    <h2>Financial markets <span style="font-size:.75rem;color:var(--muted);font-weight:500">stocks via Yahoo · warrants via Onvista</span></h2>
+    {% if markets %}
+    <div class="table-wrap"><table>
+        <thead><tr><th>Instrument</th><th>Type</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Value</th><th></th></tr></thead>
+        <tbody>
+        {% for m in markets %}
+        <tr>
+            <td>
+                {% if m.type == 'Stock' %}
+                <span class="mono" style="color:var(--cyan);font-weight:600">{{ m.label }}</span>
+                {% else %}
+                {{ m.label }}
+                <div class="mono" style="font-size:.68rem;color:var(--muted)">{{ m.ident }}</div>
+                {% endif %}
+            </td>
+            <td><span class="tag {{ 'in' if m.type == 'Stock' else '' }}">{{ m.type }}</span></td>
+            <td class="num">{{ m.quantity if m.type == 'Stock' else m.quantity|int }}</td>
+            <td class="num">{% if m.price %}{{ currency_symbol }}{{ m.price }}{% else %}—{% endif %}</td>
+            <td class="num">{% if m.value %}{{ currency_symbol }}{{ m.value|money }}{% else %}—{% endif %}</td>
+            <td><form method="post" action="{{ url_for('networth_delete', asset_id=m.id) }}"
+                      onsubmit="return confirm('Remove {{ m.label }}?')" style="text-align:right">
+                <button class="icon-btn danger">🗑</button></form></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+    {% else %}<div class="empty" style="padding:1.4rem">No holdings yet.</div>{% endif %}
 
-        <form method="post" action="{{ url_for('networth_add') }}"
-              style="display:flex;gap:.6rem;margin-top:1rem;align-items:end;flex-wrap:wrap">
-            <input type="hidden" name="kind" value="stock">
-            <div class="fg" style="flex:1;min-width:130px">
-                <label>Symbol (Yahoo format)</label>
-                <input type="text" name="label" required placeholder="AAPL, VWCE.DE…">
-            </div>
-            <div class="fg" style="width:110px">
-                <label>Shares</label>
-                <input type="number" step="any" min="0" name="quantity" required placeholder="0">
-            </div>
-            <button class="btn sm" type="submit">+ Add</button>
-        </form>
-        <div style="color:var(--muted);font-size:.72rem;margin-top:.5rem">
-            Sync holdings from Interactive Brokers manually — prices update automatically (USD converted to EUR).
+    <form method="post" action="{{ url_for('networth_add') }}"
+          style="display:flex;gap:.6rem;margin-top:1rem;align-items:end;flex-wrap:wrap">
+        <div class="fg" style="width:110px">
+            <label>Type</label>
+            <select name="kind">
+                <option value="stock">Stock</option>
+                <option value="warrant">Warrant</option>
+            </select>
         </div>
+        <div class="fg" style="flex:1;min-width:140px">
+            <label>Symbol / name</label>
+            <input type="text" name="label" required placeholder="AAPL · NVDA 17DEC27 220 C">
+        </div>
+        <div class="fg" style="width:170px">
+            <label>ISIN (warrants only)</label>
+            <input type="text" name="address" placeholder="DE000…">
+        </div>
+        <div class="fg" style="width:100px">
+            <label>Qty</label>
+            <input type="number" step="any" min="0" name="quantity" required placeholder="0">
+        </div>
+        <button class="btn sm" type="submit">+ Add</button>
+    </form>
+    <div style="color:var(--muted);font-size:.72rem;margin-top:.5rem">
+        Sync holdings from Interactive Brokers manually — prices update automatically (USD converted to EUR).
     </div>
+</div>
 
+<div class="split" style="margin-top:1.2rem">
     <!-- Crypto -->
     <div class="panel glass">
         <h2>Crypto {% if btc_price %}<span style="font-size:.75rem;color:var(--muted);font-weight:500">BTC {{ currency_symbol }}{{ btc_price|money }}</span>{% endif %}</h2>
@@ -129,83 +135,41 @@
             <button class="btn sm" type="submit">+ Add</button>
         </form>
     </div>
-</div>
 
-<!-- Warrants (German-listed, priced via Onvista) -->
-<div class="panel glass" style="margin-top:1.2rem">
-    <h2>Warrants <span style="font-size:.75rem;color:var(--muted);font-weight:500">DE-listed · live prices via Onvista</span></h2>
-    {% if warrants %}
-    <div class="table-wrap"><table>
-        <thead><tr><th>Name</th><th>ISIN</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Value</th><th></th></tr></thead>
-        <tbody>
-        {% for w in warrants %}
-        <tr>
-            <td>{{ w.label }}</td>
-            <td class="mono" style="color:var(--cyan)">{{ w.address }}</td>
-            <td class="num">{{ w.quantity|int }}</td>
-            <td class="num">{% if w.price %}{{ currency_symbol }}{{ w.price }}{% else %}—{% endif %}</td>
-            <td class="num">{% if w.value %}{{ currency_symbol }}{{ w.value|money }}{% else %}—{% endif %}</td>
-            <td><form method="post" action="{{ url_for('networth_delete', asset_id=w.id) }}"
-                      onsubmit="return confirm('Remove {{ w.label }}?')" style="text-align:right">
-                <button class="icon-btn danger">🗑</button></form></td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table></div>
-    {% else %}<div class="empty" style="padding:1.4rem">No warrants yet.</div>{% endif %}
+    <!-- Other / manual-value assets -->
+    <div class="panel glass">
+        <h2>Other assets <span style="font-size:.75rem;color:var(--muted);font-weight:500">fixed value — update manually</span></h2>
+        {% if manual %}
+        <div class="table-wrap"><table>
+            <thead><tr><th>Asset</th><th class="num">Value</th><th></th></tr></thead>
+            <tbody>
+            {% for m in manual %}
+            <tr>
+                <td>{{ m.label }}</td>
+                <td class="num">{{ currency_symbol }}{{ m.value|money }}</td>
+                <td><form method="post" action="{{ url_for('networth_delete', asset_id=m.id) }}"
+                          onsubmit="return confirm('Remove {{ m.label }}?')" style="text-align:right">
+                    <button class="icon-btn danger">🗑</button></form></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}<div class="empty" style="padding:1.4rem">Nothing here yet — for holdings no free API can price.</div>{% endif %}
 
-    <form method="post" action="{{ url_for('networth_add') }}"
-          style="display:flex;gap:.6rem;margin-top:1rem;align-items:end;flex-wrap:wrap">
-        <input type="hidden" name="kind" value="warrant">
-        <div class="fg" style="flex:1;min-width:140px">
-            <label>Name</label>
-            <input type="text" name="label" required placeholder="NVDA 17DEC27 220 C…">
-        </div>
-        <div class="fg" style="width:170px">
-            <label>ISIN</label>
-            <input type="text" name="address" required placeholder="DE000…">
-        </div>
-        <div class="fg" style="width:100px">
-            <label>Qty</label>
-            <input type="number" step="any" min="0" name="quantity" required placeholder="0">
-        </div>
-        <button class="btn sm" type="submit">+ Add</button>
-    </form>
-</div>
-
-<!-- Other / manual-value assets -->
-<div class="panel glass" style="margin-top:1.2rem">
-    <h2>Other assets <span style="font-size:.75rem;color:var(--muted);font-weight:500">fixed value — update manually</span></h2>
-    {% if manual %}
-    <div class="table-wrap"><table>
-        <thead><tr><th>Asset</th><th class="num">Value</th><th></th></tr></thead>
-        <tbody>
-        {% for m in manual %}
-        <tr>
-            <td>{{ m.label }}</td>
-            <td class="num">{{ currency_symbol }}{{ m.value|money }}</td>
-            <td><form method="post" action="{{ url_for('networth_delete', asset_id=m.id) }}"
-                      onsubmit="return confirm('Remove {{ m.label }}?')" style="text-align:right">
-                <button class="icon-btn danger">🗑</button></form></td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table></div>
-    {% else %}<div class="empty" style="padding:1.4rem">Nothing here yet — for holdings no free API can price (e.g. warrants).</div>{% endif %}
-
-    <form method="post" action="{{ url_for('networth_add') }}"
-          style="display:flex;gap:.6rem;margin-top:1rem;align-items:end;flex-wrap:wrap">
-        <input type="hidden" name="kind" value="manual">
-        <div class="fg" style="flex:1;min-width:150px">
-            <label>Label</label>
-            <input type="text" name="label" required placeholder="IBKR warrants…">
-        </div>
-        <div class="fg" style="width:140px">
-            <label>Value ({{ currency_code }})</label>
-            <input type="number" step="0.01" min="0" name="quantity" required placeholder="0.00">
-        </div>
-        <button class="btn sm" type="submit">+ Add</button>
-    </form>
+        <form method="post" action="{{ url_for('networth_add') }}"
+              style="display:flex;gap:.6rem;margin-top:1rem;align-items:end;flex-wrap:wrap">
+            <input type="hidden" name="kind" value="manual">
+            <div class="fg" style="flex:1;min-width:130px">
+                <label>Label</label>
+                <input type="text" name="label" required placeholder="…">
+            </div>
+            <div class="fg" style="width:130px">
+                <label>Value ({{ currency_code }})</label>
+                <input type="number" step="0.01" min="0" name="quantity" required placeholder="0.00">
+            </div>
+            <button class="btn sm" type="submit">+ Add</button>
+        </form>
+    </div>
 </div>
 
 <!-- Collectibles -->

@@ -338,20 +338,22 @@ def networth_view():
             crypto.append({**a, 'qty': qty, 'live': live is not None,
                            'value': round(qty * btc, 2) if btc else None})
 
+    # One combined "financial markets" list: stocks + warrants with a type tag
+    markets = ([{**s, 'type': 'Stock', 'ident': s['label']} for s in stocks]
+               + [{**w, 'type': 'Warrant', 'ident': w['address']} for w in warrants])
+
     cards = networth.cardvault_snapshot()
     totals = {
-        'stocks': round(sum(s['value'] or 0 for s in stocks), 2),
-        'warrants': round(sum(w['value'] or 0 for w in warrants), 2),
+        'markets': round(sum(m['value'] or 0 for m in markets), 2),
         'crypto': round(sum(c['value'] or 0 for c in crypto), 2),
         'other': round(sum(m['value'] for m in manual), 2),
         'collectibles': cards['value'] if cards else 0,
     }
     totals['net'] = round(sum(totals.values()), 2)
 
-    return render_template('networth.html', stocks=stocks, crypto=crypto,
-                           warrants=warrants, manual=manual, cards=cards,
-                           totals=totals, btc_price=btc,
-                           table_missing=table_missing)
+    return render_template('networth.html', markets=markets, crypto=crypto,
+                           manual=manual, cards=cards, totals=totals,
+                           btc_price=btc, table_missing=table_missing)
 
 
 @app.route('/networth/add', methods=['POST'])
