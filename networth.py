@@ -40,15 +40,34 @@ def _get(url, **kw):
     return httpx.get(url, timeout=8, follow_redirects=True, **kw)
 
 
+_last_good = {}  # key -> value; survives TTL expiry as a stale fallback
+
+
 def btc_price_eur():
+    """BTC price in EUR with a provider fallback chain — CoinGecko rate-limits
+    datacenter IPs (e.g. Render), so a single source blanks out intermittently."""
     if (v := _cached('btc')) is not None:
         return v
-    try:
-        r = _get('https://api.coingecko.com/api/v3/simple/price',
-                 params={'ids': 'bitcoin', 'vs_currencies': 'eur'})
-        return _store('btc', float(r.json()['bitcoin']['eur']))
-    except Exception:
-        return None
+
+    providers = (
+        lambda: float(_get('https://api.coingecko.com/api/v3/simple/price',
+                           params={'ids': 'bitcoin', 'vs_currencies': 'eur'})
+                      .json()['bitcoin']['eur']),
+        lambda: float(_get('https://api.binance.com/api/v3/ticker/price',
+                           params={'symbol': 'BTCEUR'}).json()['price']),
+        lambda: float(next(iter(_get('https://api.kraken.com/0/public/Ticker',
+                                     params={'pair': 'XBTEUR'})
+                                .json()['result'].values()))['c'][0]),
+    )
+    for fetch in providers:
+        try:
+            price = fetch()
+            _last_good['btc'] = price
+            return _store('btc', price)
+        except Exception:
+            continue
+    # All providers down: serve the last price we ever saw rather than blanking.
+    return _last_good.get('btc')
 
 
 _UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
