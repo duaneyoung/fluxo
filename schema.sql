@@ -45,3 +45,13 @@ create table if not exists net_worth_assets (
     address     text,                   -- optional BTC address for live balance lookup
     created_at  timestamptz default now()
 );
+
+-- ============ NET WORTH HISTORY (daily snapshots) ============
+create table if not exists net_worth_history (
+    snapped_on    date primary key,
+    markets       numeric default 0,
+    crypto        numeric default 0,
+    collectibles  numeric default 0,
+    other         numeric default 0,
+    total         numeric default 0
+);

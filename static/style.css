@@ -142,6 +142,17 @@ label{font-size:.8rem;color:var(--muted);display:block;margin-bottom:.35rem}
 /* keep sign + currency + amount on one line */
 .amt{white-space:nowrap}
 
+/* ---------- NET WORTH HERO CARD ---------- */
+.nw-hero{margin-bottom:1rem;padding:1.6rem 1.8rem;
+  background:linear-gradient(135deg,rgba(79,70,229,.30),rgba(124,58,237,.18)) ,rgba(255,255,255,.05);
+  border-color:rgba(124,92,255,.45);
+  box-shadow:0 12px 40px rgba(79,70,229,.25), inset 0 1px 0 rgba(255,255,255,.15)}
+.nw-hero .lbl{font-size:.9rem}
+.nw-hero .val{font-size:2.6rem;letter-spacing:-1.5px;margin-top:.4rem}
+.nw-sub{grid-template-columns:repeat(3,1fr)}
+@media(max-width:900px){.nw-sub{grid-template-columns:1fr}
+  .nw-hero .val{font-size:2rem}}
+
 /* ---------- TREND DELTA STRIP (compact, bubble chips) ---------- */
 .delta-strip{display:flex;gap:1.2rem;flex-wrap:wrap;margin-bottom:1rem;align-items:center}
 .delta-group{display:inline-flex;align-items:center;gap:.45rem}

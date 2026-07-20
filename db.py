@@ -696,3 +696,37 @@ def add_asset(form):
 
 def delete_asset(asset_id):
     get_client().table('net_worth_assets').delete().eq('id', asset_id).execute()
+
+
+# --- NET WORTH HISTORY (daily snapshots) ---
+def save_networth_snapshot(totals):
+    """Upsert today's snapshot — page loads refresh the same-day row, so the
+    stored value is the freshest of the day. Never raises."""
+    try:
+        get_client().table('net_worth_history').upsert({
+            'snapped_on': date.today().isoformat(),
+            'markets': totals.get('markets', 0),
+            'crypto': totals.get('crypto', 0),
+            'collectibles': totals.get('collectibles', 0),
+            'other': totals.get('other', 0),
+            'total': totals.get('net', 0),
+        }).execute()
+        return True
+    except Exception:
+        return False
+
+
+def get_networth_history():
+    """Daily snapshots, oldest first. None if the table isn't created yet."""
+    try:
+        rows = get_client().table('net_worth_history').select('*') \
+            .order('snapped_on').execute().data
+    except Exception:
+        return None
+    return [{
+        'date': _s(r.get('snapped_on')),
+        'total': _f(r.get('total')),
+        'markets': _f(r.get('markets')),
+        'crypto': _f(r.get('crypto')),
+        'collectibles': _f(r.get('collectibles')),
+    } for r in rows]

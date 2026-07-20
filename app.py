@@ -351,9 +351,17 @@ def networth_view():
     }
     totals['net'] = round(sum(totals.values()), 2)
 
+    # Daily snapshot: refresh today's row with the freshest valuation,
+    # then pull the series for the trend chart.
+    if not table_missing and totals['net'] > 0:
+        db.save_networth_snapshot(totals)
+    history = db.get_networth_history()
+
     return render_template('networth.html', markets=markets, crypto=crypto,
                            manual=manual, cards=cards, totals=totals,
-                           btc_price=btc, table_missing=table_missing)
+                           btc_price=btc, table_missing=table_missing,
+                           history=history,
+                           history_json=json.dumps(history or []))
 
 
 @app.route('/networth/add', methods=['POST'])
