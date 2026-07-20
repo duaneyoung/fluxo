@@ -566,7 +566,17 @@ def get_trends(all_txs=None):
             'yoy': pct(val(last_full, key), val(yoy_ref, key)),
         }
 
+    # Running totals: current month-to-date + year-to-date
+    this_month = today.strftime('%Y-%m')
+    this_year = today.strftime('%Y')
+    mtd = {k: round(monthly.get(this_month, {}).get(k, 0.0), 2)
+           for k in ('income', 'expenses', 'investments')}
+    ytd = {k: round(sum(v[k] for m, v in monthly.items() if m.startswith(this_year)), 2)
+           for k in ('income', 'expenses', 'investments')}
+
     return {
+        'mtd': mtd,
+        'ytd': ytd,
         'labels': [datetime.strptime(m, '%Y-%m').strftime('%b %y') for m in months],
         'income': [round(monthly[m]['income'], 2) for m in months],
         'expenses': [round(monthly[m]['expenses'], 2) for m in months],

@@ -142,15 +142,27 @@ label{font-size:.8rem;color:var(--muted);display:block;margin-bottom:.35rem}
 /* keep sign + currency + amount on one line */
 .amt{white-space:nowrap}
 
-/* ---------- TREND DELTA STRIP ---------- */
-.delta-strip{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:1rem}
-.delta-box{display:inline-flex;align-items:center;gap:.55rem;padding:.45rem .85rem;
-  border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--glass-brd);
-  font-size:.78rem}
-.delta-name{font-weight:600}
-.delta-val{font-variant-numeric:tabular-nums;color:var(--muted)}
-.delta-val.pos{color:var(--green)}
-.delta-val.neg{color:var(--red)}
+/* ---------- TREND STAT CARDS ---------- */
+.trend-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:.8rem;margin-bottom:1.1rem}
+.trend-card{padding:.85rem 1rem;border-radius:14px;background:rgba(255,255,255,.04);
+  border:1px solid var(--glass-brd);border-left:3px solid transparent}
+.tc-head{display:flex;align-items:center;gap:.5rem;font-size:.82rem;font-weight:600;
+  margin-bottom:.6rem}
+.tc-vals{display:flex;gap:1.4rem;margin-bottom:.6rem}
+.tc-label{font-size:.64rem;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;
+  margin-bottom:.15rem}
+.tc-money{font-size:1.05rem;font-weight:700;letter-spacing:-.3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.tc-deltas{display:flex;gap:.45rem}
+.tc-chip{display:inline-flex;align-items:center;gap:.35rem;font-size:.72rem;font-weight:600;
+  font-variant-numeric:tabular-nums;padding:.2rem .6rem;border-radius:999px;
+  background:rgba(255,255,255,.06);color:var(--muted)}
+.tc-chip-label{font-weight:500;color:var(--muted);font-size:.66rem;text-transform:uppercase;
+  letter-spacing:.4px}
+.tc-chip.pos{color:var(--green);background:rgba(74,222,128,.1)}
+.tc-chip.neg{color:var(--red);background:rgba(239,68,68,.1)}
+
+@media(max-width:900px){.trend-cards{grid-template-columns:1fr}}
 
 /* ---------- GRID SPLIT ---------- */
 .split{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.4rem}
