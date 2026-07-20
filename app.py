@@ -308,31 +308,46 @@ def save_categories():
     return jsonify({'success': True})
 
 
-@app.route('/networth')
-def networth_view():
+def _compute_networth():
+    """Value every asset. All external quotes are fetched in parallel —
+    sequentially, 20+ HTTP calls can stack to minutes when a provider
+    throttles."""
+    from concurrent.futures import ThreadPoolExecutor
     import networth
     assets = db.get_assets()
     table_missing = assets is None
     assets = assets or []
 
-    btc = networth.btc_price_eur()
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        btc_f = ex.submit(networth.btc_price_eur)
+        cards_f = ex.submit(networth.cardvault_snapshot)
+        price_f = {}
+        for a in assets:
+            if a['kind'] == 'stock':
+                price_f[a['id']] = ex.submit(networth.stock_quote_eur, a['label'])
+            elif a['kind'] == 'warrant' and a['address']:
+                price_f[a['id']] = ex.submit(networth.warrant_quote_eur, a['address'])
+            elif a['kind'] == 'crypto' and a['address']:
+                price_f[a['id']] = ex.submit(networth.btc_address_balance, a['address'])
+        btc = btc_f.result()
+        cards = cards_f.result()
+        prices = {k: f.result() for k, f in price_f.items()}
+
     stocks, crypto, manual, warrants = [], [], [], []
     for a in assets:
         if a['kind'] == 'stock':
-            price = networth.stock_quote_eur(a['label'])
+            price = prices.get(a['id'])
             stocks.append({**a, 'price': price,
                            'value': round(price * a['quantity'], 2) if price else None})
         elif a['kind'] == 'warrant':
-            # German-listed warrant: address column holds the ISIN.
-            price = networth.warrant_quote_eur(a['address']) if a['address'] else None
+            price = prices.get(a['id'])
             warrants.append({**a, 'price': price,
                              'value': round(price * a['quantity'], 2) if price else None})
         elif a['kind'] == 'manual':
-            # Fixed-value asset: quantity holds the EUR value directly.
             manual.append({**a, 'value': round(a['quantity'], 2)})
         else:
             qty = a['quantity']
-            live = networth.btc_address_balance(a['address']) if a['address'] else None
+            live = prices.get(a['id'])
             if live is not None:
                 qty = live
             crypto.append({**a, 'qty': qty, 'live': live is not None,
@@ -351,15 +366,50 @@ def networth_view():
     }
     totals['net'] = round(sum(totals.values()), 2)
 
-    # Daily snapshot: refresh today's row with the freshest valuation,
-    # then pull the series for the trend chart.
-    if not table_missing and totals['net'] > 0:
-        db.save_networth_snapshot(totals)
+    return {'markets': markets, 'crypto': crypto, 'manual': manual,
+            'cards': cards, 'totals': totals, 'btc': btc,
+            'table_missing': table_missing}
+
+
+# One snapshot per day, triggered by ANY request (incl. the /health ping a
+# scheduler hits) — runs in a background thread so requests stay fast.
+_snap_state = {'date': None}
+
+
+def _take_daily_snapshot():
+    try:
+        nw = _compute_networth()
+        if not nw['table_missing'] and nw['totals']['net'] > 0:
+            db.save_networth_snapshot(nw['totals'])
+    except Exception:
+        pass  # never let the snapshot break anything
+
+
+@app.before_request
+def _daily_snapshot_hook():
+    import threading
+    from datetime import date as _date
+    today = _date.today().isoformat()
+    if _snap_state['date'] == today:
+        return
+    _snap_state['date'] = today  # claim the day before spawning (no stampede)
+    threading.Thread(target=_take_daily_snapshot, daemon=True).start()
+
+
+@app.route('/networth')
+def networth_view():
+    nw = _compute_networth()
+
+    # Page visits refresh today's snapshot with the freshest valuation.
+    if not nw['table_missing'] and nw['totals']['net'] > 0:
+        db.save_networth_snapshot(nw['totals'])
     history = db.get_networth_history()
 
-    return render_template('networth.html', markets=markets, crypto=crypto,
-                           manual=manual, cards=cards, totals=totals,
-                           btc_price=btc, table_missing=table_missing,
+    return render_template('networth.html', markets=nw['markets'],
+                           crypto=nw['crypto'], manual=nw['manual'],
+                           cards=nw['cards'], totals=nw['totals'],
+                           btc_price=nw['btc'],
+                           table_missing=nw['table_missing'],
                            history=history,
                            history_json=json.dumps(history or []))
 
