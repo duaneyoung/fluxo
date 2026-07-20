@@ -316,12 +316,16 @@ def networth_view():
     assets = assets or []
 
     btc = networth.btc_price_eur()
-    stocks, crypto = [], []
+    stocks, crypto, manual = [], [], []
     for a in assets:
         if a['kind'] == 'stock':
             price = networth.stock_quote_eur(a['label'])
             stocks.append({**a, 'price': price,
                            'value': round(price * a['quantity'], 2) if price else None})
+        elif a['kind'] == 'manual':
+            # Fixed-value asset (e.g. warrants no free API can price):
+            # quantity holds the EUR value directly.
+            manual.append({**a, 'value': round(a['quantity'], 2)})
         else:
             qty = a['quantity']
             live = networth.btc_address_balance(a['address']) if a['address'] else None
@@ -334,13 +338,14 @@ def networth_view():
     totals = {
         'stocks': round(sum(s['value'] or 0 for s in stocks), 2),
         'crypto': round(sum(c['value'] or 0 for c in crypto), 2),
+        'other': round(sum(m['value'] for m in manual), 2),
         'collectibles': cards['value'] if cards else 0,
     }
     totals['net'] = round(sum(totals.values()), 2)
 
     return render_template('networth.html', stocks=stocks, crypto=crypto,
-                           cards=cards, totals=totals, btc_price=btc,
-                           table_missing=table_missing)
+                           manual=manual, cards=cards, totals=totals,
+                           btc_price=btc, table_missing=table_missing)
 
 
 @app.route('/networth/add', methods=['POST'])

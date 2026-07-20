@@ -35,6 +35,12 @@
         <div class="lbl"><span class="dot" style="background:var(--pink)"></span>Collectibles</div>
         <div class="val">{{ currency_symbol }}{{ totals.collectibles|money }}</div>
     </div>
+    {% if totals.other %}
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--muted)"></span>Other</div>
+        <div class="val">{{ currency_symbol }}{{ totals.other|money }}</div>
+    </div>
+    {% endif %}
 </div>
 
 <div class="split">
@@ -117,6 +123,41 @@
             <button class="btn sm" type="submit">+ Add</button>
         </form>
     </div>
+</div>
+
+<!-- Other / manual-value assets -->
+<div class="panel glass" style="margin-top:1.2rem">
+    <h2>Other assets <span style="font-size:.75rem;color:var(--muted);font-weight:500">fixed value — update manually</span></h2>
+    {% if manual %}
+    <div class="table-wrap"><table>
+        <thead><tr><th>Asset</th><th class="num">Value</th><th></th></tr></thead>
+        <tbody>
+        {% for m in manual %}
+        <tr>
+            <td>{{ m.label }}</td>
+            <td class="num">{{ currency_symbol }}{{ m.value|money }}</td>
+            <td><form method="post" action="{{ url_for('networth_delete', asset_id=m.id) }}"
+                      onsubmit="return confirm('Remove {{ m.label }}?')" style="text-align:right">
+                <button class="icon-btn danger">🗑</button></form></td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table></div>
+    {% else %}<div class="empty" style="padding:1.4rem">Nothing here yet — for holdings no free API can price (e.g. warrants).</div>{% endif %}
+
+    <form method="post" action="{{ url_for('networth_add') }}"
+          style="display:flex;gap:.6rem;margin-top:1rem;align-items:end;flex-wrap:wrap">
+        <input type="hidden" name="kind" value="manual">
+        <div class="fg" style="flex:1;min-width:150px">
+            <label>Label</label>
+            <input type="text" name="label" required placeholder="IBKR warrants…">
+        </div>
+        <div class="fg" style="width:140px">
+            <label>Value ({{ currency_code }})</label>
+            <input type="number" step="0.01" min="0" name="quantity" required placeholder="0.00">
+        </div>
+        <button class="btn sm" type="submit">+ Add</button>
+    </form>
 </div>
 
 <!-- Collectibles -->
