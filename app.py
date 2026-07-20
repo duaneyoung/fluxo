@@ -224,6 +224,21 @@ def import_revolut():
     except ValueError as exc:
         return render_template('revolut_preview.html', rows_json='[]',
                                error=str(exc))
+
+    # Flag potential duplicates: same date + amount + direction as an
+    # existing transaction. Count-aware — two identical coffees only flag
+    # as many as already exist in the DB.
+    from collections import Counter
+    existing = Counter(
+        (t['date'], round(t['amount'], 2), t['transaction_type'])
+        for t in db.get_transactions())
+    for r in rows:
+        key = (r['date'], round(r['amount'], 2), r['transaction_type'])
+        if r['include'] and existing.get(key, 0) > 0:
+            existing[key] -= 1
+            r['include'] = False
+            r['note'] = 'possible duplicate'
+
     return render_template('revolut_preview.html',
                            rows_json=json.dumps(rows), error=None)
 
