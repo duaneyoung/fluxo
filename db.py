@@ -665,3 +665,34 @@ def _cumulative_chart(all_txs, exclude_investments, exclude_rsu, exclude_one_off
         'rank_total': len(series),
         'rank_day': today.day,
     }
+
+
+# --- NET WORTH ASSETS ---
+def get_assets():
+    """Manual holdings (stocks + crypto wallets). Empty list if the
+    net_worth_assets table hasn't been created yet."""
+    try:
+        rows = get_client().table('net_worth_assets').select('*') \
+            .order('kind').order('id').execute().data
+    except Exception:
+        return None  # table not created yet
+    return [{
+        'id': r['id'],
+        'kind': _s(r.get('kind')),
+        'label': _s(r.get('label')),
+        'quantity': _f(r.get('quantity')),
+        'address': _s(r.get('address')),
+    } for r in rows]
+
+
+def add_asset(form):
+    get_client().table('net_worth_assets').insert({
+        'kind': form.get('kind', 'stock'),
+        'label': form.get('label', '').strip(),
+        'quantity': _f(form.get('quantity')),
+        'address': form.get('address', '').strip() or None,
+    }).execute()
+
+
+def delete_asset(asset_id):
+    get_client().table('net_worth_assets').delete().eq('id', asset_id).execute()

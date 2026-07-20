@@ -44,6 +44,9 @@
                 <a href="{{ url_for('transactions_view') }}" class="nav-link {% if request.endpoint in ['transactions_view', 'add_transaction_view', 'edit_transaction_view'] %}active{% endif %}">
                     <span class="nav-ico">📋</span> Transactions
                 </a>
+                <a href="{{ url_for('networth_view') }}" class="nav-link {% if request.endpoint == 'networth_view' %}active{% endif %}">
+                    <span class="nav-ico">💎</span> Net worth
+                </a>
                 <a href="{{ url_for('settings_view') }}" class="nav-link {% if request.endpoint == 'settings_view' %}active{% endif %}">
                     <span class="nav-ico">⚙️</span> Settings
                 </a>
@@ -65,6 +68,9 @@
             </a>
             <a href="{{ url_for('transactions_view') }}" class="bn-link {% if request.endpoint in ['transactions_view', 'add_transaction_view', 'edit_transaction_view'] %}active{% endif %}">
                 <span class="bn-ico">📋</span><span class="bn-label">Transactions</span>
+            </a>
+            <a href="{{ url_for('networth_view') }}" class="bn-link {% if request.endpoint == 'networth_view' %}active{% endif %}">
+                <span class="bn-ico">💎</span><span class="bn-label">Net worth</span>
             </a>
             <a href="{{ url_for('settings_view') }}" class="bn-link {% if request.endpoint == 'settings_view' %}active{% endif %}">
                 <span class="bn-ico">⚙️</span><span class="bn-label">Settings</span>

@@ -308,6 +308,53 @@ def save_categories():
     return jsonify({'success': True})
 
 
+@app.route('/networth')
+def networth_view():
+    import networth
+    assets = db.get_assets()
+    table_missing = assets is None
+    assets = assets or []
+
+    btc = networth.btc_price_eur()
+    stocks, crypto = [], []
+    for a in assets:
+        if a['kind'] == 'stock':
+            price = networth.stock_quote_eur(a['label'])
+            stocks.append({**a, 'price': price,
+                           'value': round(price * a['quantity'], 2) if price else None})
+        else:
+            qty = a['quantity']
+            live = networth.btc_address_balance(a['address']) if a['address'] else None
+            if live is not None:
+                qty = live
+            crypto.append({**a, 'qty': qty, 'live': live is not None,
+                           'value': round(qty * btc, 2) if btc else None})
+
+    cards = networth.cardvault_snapshot()
+    totals = {
+        'stocks': round(sum(s['value'] or 0 for s in stocks), 2),
+        'crypto': round(sum(c['value'] or 0 for c in crypto), 2),
+        'collectibles': cards['value'] if cards else 0,
+    }
+    totals['net'] = round(sum(totals.values()), 2)
+
+    return render_template('networth.html', stocks=stocks, crypto=crypto,
+                           cards=cards, totals=totals, btc_price=btc,
+                           table_missing=table_missing)
+
+
+@app.route('/networth/add', methods=['POST'])
+def networth_add():
+    db.add_asset(request.form)
+    return redirect(url_for('networth_view'))
+
+
+@app.route('/networth/delete/<int:asset_id>', methods=['POST'])
+def networth_delete(asset_id):
+    db.delete_asset(asset_id)
+    return redirect(url_for('networth_view'))
+
+
 @app.route('/health')
 def health():
     """Cheap keep-alive target — no DB, no templates."""

@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Net Worth{% endblock %}
+{% block content %}
+<div class="page-head">
+    <div>
+        <h1>Net worth</h1>
+        <div class="sub">Stocks, crypto and collectibles — live valuations, refreshed every ~10 min</div>
+    </div>
+</div>
+
+{% if table_missing %}
+<div class="glass panel" style="margin-bottom:1.4rem">
+    <div class="empty"><div class="big">🗄️</div>
+        One-time setup: run the <code>net_worth_assets</code> block from <code>schema.sql</code>
+        in the Supabase SQL editor, then reload this page.
+    </div>
+</div>
+{% endif %}
+
+<!-- Totals -->
+<div class="metrics">
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--violet)"></span>Net worth</div>
+        <div class="val">{{ currency_symbol }}{{ totals.net|money }}</div>
+    </div>
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--cyan)"></span>Stocks</div>
+        <div class="val">{{ currency_symbol }}{{ totals.stocks|money }}</div>
+    </div>
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:#fbbf24"></span>Crypto</div>
+        <div class="val">{{ currency_symbol }}{{ totals.crypto|money }}</div>
+    </div>
+    <div class="metric glass">
+        <div class="lbl"><span class="dot" style="background:var(--pink)"></span>Collectibles</div>
+        <div class="val">{{ currency_symbol }}{{ totals.collectibles|money }}</div>
+    </div>
+</div>
+
+<div class="split">
+    <!-- Stocks -->
+    <div class="panel glass">
+        <h2>Stocks</h2>
+        {% if stocks %}
+        <div class="table-wrap"><table>
+            <thead><tr><th>Symbol</th><th class="num">Shares</th><th class="num">Price</th><th class="num">Value</th><th></th></tr></thead>
+            <tbody>
+            {% for s in stocks %}
+            <tr>
+                <td class="mono" style="color:var(--cyan);font-weight:600">{{ s.label }}</td>
+                <td class="num">{{ s.quantity }}</td>
+                <td class="num">{% if s.price %}{{ currency_symbol }}{{ s.price|money }}{% else %}—{% endif %}</td>
+                <td class="num">{% if s.value %}{{ currency_symbol }}{{ s.value|money }}{% else %}—{% endif %}</td>
+                <td><form method="post" action="{{ url_for('networth_delete', asset_id=s.id) }}"
+                          onsubmit="return confirm('Remove {{ s.label }}?')" style="text-align:right">
+                    <button class="icon-btn danger">🗑</button></form></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}<div class="empty" style="padding:1.4rem">No holdings yet.</div>{% endif %}
+
+        <form method="post" action="{{ url_for('networth_add') }}"
+              style="display:flex;gap:.6rem;margin-top:1rem;align-items:end;flex-wrap:wrap">
+            <input type="hidden" name="kind" value="stock">
+            <div class="fg" style="flex:1;min-width:130px">
+                <label>Symbol (Yahoo format)</label>
+                <input type="text" name="label" required placeholder="AAPL, VWCE.DE…">
+            </div>
+            <div class="fg" style="width:110px">
+                <label>Shares</label>
+                <input type="number" step="any" min="0" name="quantity" required placeholder="0">
+            </div>
+            <button class="btn sm" type="submit">+ Add</button>
+        </form>
+        <div style="color:var(--muted);font-size:.72rem;margin-top:.5rem">
+            Sync holdings from Interactive Brokers manually — prices update automatically (USD converted to EUR).
+        </div>
+    </div>
+
+    <!-- Crypto -->
+    <div class="panel glass">
+        <h2>Crypto {% if btc_price %}<span style="font-size:.75rem;color:var(--muted);font-weight:500">BTC {{ currency_symbol }}{{ btc_price|money }}</span>{% endif %}</h2>
+        {% if crypto %}
+        <div class="table-wrap"><table>
+            <thead><tr><th>Wallet</th><th class="num">BTC</th><th class="num">Value</th><th></th></tr></thead>
+            <tbody>
+            {% for c in crypto %}
+            <tr>
+                <td>{{ c.label }} {% if c.live %}<span class="tag in" title="balance fetched from chain">live</span>{% endif %}</td>
+                <td class="num">{{ '%.8f'|format(c.qty) }}</td>
+                <td class="num">{% if c.value %}{{ currency_symbol }}{{ c.value|money }}{% else %}—{% endif %}</td>
+                <td><form method="post" action="{{ url_for('networth_delete', asset_id=c.id) }}"
+                          onsubmit="return confirm('Remove {{ c.label }}?')" style="text-align:right">
+                    <button class="icon-btn danger">🗑</button></form></td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table></div>
+        {% else %}<div class="empty" style="padding:1.4rem">No wallets yet.</div>{% endif %}
+
+        <form method="post" action="{{ url_for('networth_add') }}"
+              style="display:flex;gap:.6rem;margin-top:1rem;align-items:end;flex-wrap:wrap">
+            <input type="hidden" name="kind" value="crypto">
+            <div class="fg" style="flex:1;min-width:110px">
+                <label>Wallet name</label>
+                <input type="text" name="label" required placeholder="Relai, Ledger…">
+            </div>
+            <div class="fg" style="width:130px">
+                <label>BTC amount</label>
+                <input type="number" step="any" min="0" name="quantity" placeholder="0.05">
+            </div>
+            <div class="fg" style="flex:1;min-width:150px">
+                <label>Address (optional, live balance)</label>
+                <input type="text" name="address" placeholder="bc1q…">
+            </div>
+            <button class="btn sm" type="submit">+ Add</button>
+        </form>
+    </div>
+</div>
+
+<!-- Collectibles -->
+<div class="panel glass" style="margin-top:1.2rem">
+    <h2>Collectibles / Business <span style="font-size:.75rem;color:var(--muted);font-weight:500">from CardVault</span></h2>
+    {% if cards %}
+    <div class="metrics" style="margin-bottom:0">
+        <div class="metric glass"><div class="lbl">Market value</div>
+            <div class="val">{{ currency_symbol }}{{ cards.value|money }}</div></div>
+        <div class="metric glass"><div class="lbl">Cost basis</div>
+            <div class="val">{{ currency_symbol }}{{ cards.cost|money }}</div></div>
+        <div class="metric glass"><div class="lbl">Unrealized</div>
+            {% set diff = cards.value - cards.cost %}
+            <div class="val {{ 'pos' if diff >= 0 else 'neg' }}">{{ '+' if diff >= 0 }}{{ currency_symbol }}{{ diff|money }}</div></div>
+        <div class="metric glass"><div class="lbl">Items in stock</div>
+            <div class="val">{{ cards.items }} <span style="font-size:.8rem;color:var(--muted)">({{ cards.priced }} priced)</span></div></div>
+    </div>
+    {% else %}
+    <div class="empty" style="padding:1.4rem">CardVault not reachable — check CARDVAULT_SUPABASE_URL/KEY.</div>
+    {% endif %}
+</div>
+{% endblock %}

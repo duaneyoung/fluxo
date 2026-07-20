@@ -34,3 +34,14 @@ create table if not exists settings (
 insert into settings (id, currency, category_hierarchy)
 values (1, 'EUR', '{}'::jsonb)
 on conflict (id) do nothing;
+
+-- ============ NET WORTH ASSETS (added later — run this block if upgrading) ============
+-- Manual holdings: stocks (ticker+shares) and crypto wallets (BTC amount or address).
+create table if not exists net_worth_assets (
+    id          bigint generated always as identity primary key,
+    kind        text not null,          -- 'stock' | 'crypto'
+    label       text not null,          -- ticker (Stooq format, e.g. AAPL.US) or wallet name
+    quantity    numeric default 0,      -- shares / BTC amount
+    address     text,                   -- optional BTC address for live balance lookup
+    created_at  timestamptz default now()
+);
