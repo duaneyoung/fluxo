@@ -80,6 +80,33 @@
     </div>
 </div>
 
+<!-- Income / expenses trend -->
+{% if trends %}
+<div class="chart-card glass">
+    <div class="chart-head">
+        <div>
+            <h2 style="margin:0">Income vs expenses</h2>
+            <div class="sub" style="color:var(--muted);font-size:.85rem">Monthly totals since the beginning · changes measured on {{ trends.ref_label }}</div>
+        </div>
+    </div>
+    <div class="delta-strip">
+        {% for key, label, color in [('income','Income','var(--green)'), ('expenses','Expenses','var(--red)'), ('investments','Investments','#fbbf24')] %}
+        <div class="delta-box">
+            <span class="dot" style="background:{{ color }}"></span>
+            <span class="delta-name">{{ label }}</span>
+            {% for period in ['mom','yoy'] %}
+            {% set v = trends.deltas[key][period] %}
+            <span class="delta-val {% if v is not none %}{{ 'pos' if v >= 0 else 'neg' }}{% endif %}">
+                {{ period|upper }} {% if v is none %}—{% else %}{{ '+' if v >= 0 }}{{ v }}%{% endif %}
+            </span>
+            {% endfor %}
+        </div>
+        {% endfor %}
+    </div>
+    <div class="chart-box"><canvas id="trendChart"></canvas></div>
+</div>
+{% endif %}
+
 <div class="split">
     <!-- Category breakdown -->
     <div class="panel glass">
@@ -161,6 +188,37 @@ new Chart(document.getElementById('spendChart'), {
         }
     }
 });
+
+// Income vs expenses trend
+const TRENDS = {{ trends_json|safe }};
+if (TRENDS) {
+    new Chart(document.getElementById('trendChart'), {
+        type: 'line',
+        data: {
+            labels: TRENDS.labels,
+            datasets: [
+                { label: 'Income', data: TRENDS.income, borderColor: '#4ade80',
+                  backgroundColor: 'rgba(74,222,128,.08)', fill: true,
+                  borderWidth: 2.4, tension: .3, pointRadius: 2, pointHoverRadius: 4 },
+                { label: 'Expenses', data: TRENDS.expenses, borderColor: '#ef4444',
+                  backgroundColor: 'transparent',
+                  borderWidth: 2.4, tension: .3, pointRadius: 2, pointHoverRadius: 4 },
+                { label: 'of which investments', data: TRENDS.investments, borderColor: '#fbbf24',
+                  backgroundColor: 'transparent', borderDash: [6, 4],
+                  borderWidth: 1.8, tension: .3, pointRadius: 0, pointHoverRadius: 4 },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { labels: { color: '#a0a3c0', usePointStyle: true, boxWidth: 8 } } },
+            scales: {
+                x: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#a0a3c0', maxTicksLimit: 16 } },
+                y: { grid: { color: 'rgba(255,255,255,.05)' }, ticks: { color: '#a0a3c0' } }
+            }
+        }
+    });
+}
 
 // Month picker -> toggle compare params and reload
 const ALL_MONTHS = [...document.querySelectorAll('.month-opt[data-month]')].map(el => el.dataset.month);

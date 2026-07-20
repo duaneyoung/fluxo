@@ -520,6 +520,62 @@ def get_dashboard_data(timeframe='this_month', exclude_investments=False,
     return {'stats': stats, 'breakdown': breakdown, 'chart': chart, 'recent': recent}
 
 
+def get_trends(all_txs=None):
+    """Monthly income / expenses / investments series across full history,
+    plus MoM and YoY deltas computed on the last *complete* month (the
+    current month is partial and would always read as a drop)."""
+    if all_txs is None:
+        all_txs = get_transactions()
+
+    monthly = {}
+    for t in all_txs:
+        if not t['date']:
+            continue
+        m = t['date'][:7]
+        d = monthly.setdefault(m, {'income': 0.0, 'expenses': 0.0, 'investments': 0.0})
+        if t['transaction_type'] == 'inflow':
+            d['income'] += t['amount']
+        else:
+            d['expenses'] += t['amount']
+            if t['category_1'] == 'Investments':
+                d['investments'] += t['amount']
+
+    months = sorted(monthly)
+    if not months:
+        return None
+
+    today = date.today()
+    first_of_month = today.replace(day=1)
+    last_full = (first_of_month - timedelta(days=1)).strftime('%Y-%m')
+    prev_full = (first_of_month - timedelta(days=1)).replace(day=1)
+    prev_full = (prev_full - timedelta(days=1)).strftime('%Y-%m')
+    yoy_ref = f"{int(last_full[:4]) - 1}{last_full[4:]}"
+
+    def val(month, key):
+        return monthly.get(month, {}).get(key)
+
+    def pct(cur, prev):
+        if cur is None or prev is None or prev == 0:
+            return None
+        return round((cur - prev) / prev * 100, 1)
+
+    deltas = {}
+    for key in ('income', 'expenses', 'investments'):
+        deltas[key] = {
+            'mom': pct(val(last_full, key), val(prev_full, key)),
+            'yoy': pct(val(last_full, key), val(yoy_ref, key)),
+        }
+
+    return {
+        'labels': [datetime.strptime(m, '%Y-%m').strftime('%b %y') for m in months],
+        'income': [round(monthly[m]['income'], 2) for m in months],
+        'expenses': [round(monthly[m]['expenses'], 2) for m in months],
+        'investments': [round(monthly[m]['investments'], 2) for m in months],
+        'ref_label': datetime.strptime(last_full, '%Y-%m').strftime('%B %Y'),
+        'deltas': deltas,
+    }
+
+
 def _month_key(d):
     return d[:7]  # 'YYYY-MM'
 

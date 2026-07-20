@@ -142,6 +142,16 @@ label{font-size:.8rem;color:var(--muted);display:block;margin-bottom:.35rem}
 /* keep sign + currency + amount on one line */
 .amt{white-space:nowrap}
 
+/* ---------- TREND DELTA STRIP ---------- */
+.delta-strip{display:flex;gap:.7rem;flex-wrap:wrap;margin-bottom:1rem}
+.delta-box{display:inline-flex;align-items:center;gap:.55rem;padding:.45rem .85rem;
+  border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--glass-brd);
+  font-size:.78rem}
+.delta-name{font-weight:600}
+.delta-val{font-variant-numeric:tabular-nums;color:var(--muted)}
+.delta-val.pos{color:var(--green)}
+.delta-val.neg{color:var(--red)}
+
 /* ---------- GRID SPLIT ---------- */
 .split{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem;margin-bottom:1.4rem}
 .panel{padding:1.3rem 1.4rem}

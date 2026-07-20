@@ -72,9 +72,13 @@ def dashboard():
         compare_months=compare,
         all_txs=all_txs,
     )
+    trends = db.get_trends(all_txs=all_txs)
+
     return render_template(
         'dashboard.html',
         data=data,
+        trends=trends,
+        trends_json=json.dumps(trends),
         months=months,
         selected_compare=compare,
         filters={
