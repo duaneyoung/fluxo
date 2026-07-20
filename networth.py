@@ -85,6 +85,24 @@ def stock_quote_eur(symbol):
         return None
 
 
+def warrant_quote_eur(isin):
+    """Live quote for a German-listed warrant/certificate via Onvista (EUR).
+    Uses last trade, falling back to bid (thin issuer paper often has no last)."""
+    key = f'w:{isin.upper()}'
+    if (v := _cached(key)) is not None:
+        return v
+    try:
+        r = _get(f'https://api.onvista.de/api/v1/derivatives/ISIN:{isin.upper()}/snapshot',
+                 headers=_UA)
+        q = r.json().get('quote', {})
+        price = q.get('last') if q.get('last') is not None else q.get('bid')
+        if price is None:
+            return None
+        return _store(key, round(float(price), 3))
+    except Exception:
+        return None
+
+
 def btc_address_balance(address):
     """Confirmed balance of a BTC address, in BTC."""
     key = f'addr:{address}'
