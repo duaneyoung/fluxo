@@ -216,22 +216,10 @@ def import_transactions():
     return redirect(url_for('transactions_view', imported=count))
 
 
-@app.route('/transactions/import-revolut', methods=['POST'])
-def import_revolut():
-    """Parse a raw Revolut export and show the editable preview."""
-    import revolut
-    file = request.files.get('file')
-    if not file:
-        return redirect(url_for('add_transaction_view'))
-    try:
-        rows = revolut.parse_export(file.read(), file.filename)
-    except ValueError as exc:
-        return render_template('revolut_preview.html', rows_json='[]',
-                               error=str(exc))
-
-    # Flag potential duplicates: same date + amount + direction as an
-    # existing transaction. Count-aware — two identical coffees only flag
-    # as many as already exist in the DB.
+def _flag_duplicates(rows):
+    """Flag potential duplicates: same date + amount + direction as an
+    existing transaction. Count-aware — two identical coffees only flag
+    as many as already exist in the DB."""
     from collections import Counter
     existing = Counter(
         (t['date'], round(t['amount'], 2), t['transaction_type'])
@@ -242,9 +230,36 @@ def import_revolut():
             existing[key] -= 1
             r['include'] = False
             r['note'] = 'possible duplicate'
+    return rows
 
-    return render_template('revolut_preview.html',
-                           rows_json=json.dumps(rows), error=None)
+
+def _bank_preview(parser, source):
+    """Shared upload → parse → dedupe → preview flow for bank imports."""
+    file = request.files.get('file')
+    if not file:
+        return redirect(url_for('add_transaction_view'))
+    try:
+        rows = parser(file.read(), file.filename)
+    except ValueError as exc:
+        return render_template('revolut_preview.html', rows_json='[]',
+                               source=source, error=str(exc))
+    return render_template('revolut_preview.html', source=source,
+                           rows_json=json.dumps(_flag_duplicates(rows)),
+                           error=None)
+
+
+@app.route('/transactions/import-revolut', methods=['POST'])
+def import_revolut():
+    """Parse a raw Revolut export and show the editable preview."""
+    import revolut
+    return _bank_preview(revolut.parse_export, 'Revolut')
+
+
+@app.route('/transactions/import-pluxee', methods=['POST'])
+def import_pluxee():
+    """Parse a Pluxee transaction-report PDF and show the editable preview."""
+    import pluxee
+    return _bank_preview(pluxee.parse_export, 'Pluxee')
 
 
 @app.route('/transactions/import-revolut/confirm', methods=['POST'])
@@ -258,7 +273,7 @@ def import_revolut_confirm():
         'category_1': r.get('category_1'),
         'category_2': r.get('category_2'),
         'category_3': r.get('category_3'),
-        'method': 'Revolut',
+        'method': r.get('method') or 'Revolut',
         'details': r.get('details', ''),
         'is_one_off': '',
     } for r in rows]

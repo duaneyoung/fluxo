@@ -124,6 +124,22 @@
     <button type="submit" class="btn full">Preview import</button>
 </form>
 
+<form method="post" action="{{ url_for('import_pluxee') }}" enctype="multipart/form-data"
+      class="glass panel" style="margin-bottom:1.2rem">
+    <h3 style="margin-bottom:.4rem">Import a Pluxee transaction report (PDF)</h3>
+    <p style="color:var(--muted);font-size:.86rem;margin-bottom:1.1rem">
+        Upload the PDF straight from the Pluxee portal. Purchases are
+        auto-classified (breakfast / lunch / groceries by merchant and time
+        of day, reloads as salary vouchers) — same editable preview with
+        duplicate detection before anything is saved.
+    </p>
+    <div class="fg" style="margin-bottom:1.1rem">
+        <input type="file" name="file" accept=".pdf" required
+               style="padding:.9rem;border-style:dashed">
+    </div>
+    <button type="submit" class="btn full">Preview import</button>
+</form>
+
 <form method="post" action="{{ url_for('import_transactions') }}" enctype="multipart/form-data" class="glass panel">
     <h3 style="margin-bottom:.4rem">Bulk import from CSV (MoneyBlox format)</h3>
     <p style="color:var(--muted);font-size:.86rem;margin-bottom:1.1rem">
