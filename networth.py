@@ -49,7 +49,7 @@ def section_fetch_times():
         ts = [t for k, (_, t) in _cache.items() if pred(k)]
         return min(ts) if ts else None
     return {
-        'markets': oldest(lambda k: k.startswith(('q:', 'w:'))),
+        'markets': oldest(lambda k: k.startswith(('q:', 'w:', 'o:'))),
         'crypto': oldest(lambda k: k == 'btc' or k.startswith('addr:')),
         'collectibles': oldest(lambda k: k == 'cardvault'),
     }
@@ -119,6 +119,20 @@ def stock_quote_eur(symbol):
     try:
         price, currency = _yahoo_quote(symbol)
         return _store(key, round(price * _fx_to_eur(currency), 2))
+    except Exception:
+        return None
+
+
+def option_quote_eur(occ_symbol):
+    """Live per-share premium for a US option contract (OCC symbol, e.g.
+    AMZN260821C00280000) via Yahoo, converted to EUR. Position value is
+    premium × 100 × signed quantity — applied by the caller."""
+    key = f'o:{occ_symbol.upper()}'
+    if (v := _cached(key)) is not None:
+        return v
+    try:
+        price, currency = _yahoo_quote(occ_symbol)
+        return _store(key, round(price * _fx_to_eur(currency), 3))
     except Exception:
         return None
 

@@ -749,15 +749,32 @@ def sync_ibkr(parsed):
             client.table('net_worth_assets').delete().eq('id', a['id']).execute()
             removed += 1
 
-    # --- single-row lines: cash + options net (EUR value as quantity) ---
-    for kind, label, value in (('cash', 'IBKR cash', parsed.get('cash_eur')),
-                               ('option_net', 'IBKR options (net)',
-                                parsed.get('options_value_eur'))):
-        if value is None:
-            continue
-        match = next((a for a in existing if a['kind'] == kind), None)
-        upsert(match, {'kind': kind, 'label': label,
-                       'quantity': round(value, 2), 'address': None})
+    # --- options: keyed by symbol (label); signed qty, OCC symbol in address ---
+    by_opt = {a['label'].upper(): a for a in existing if a['kind'] == 'option'}
+    seen = set()
+    for o in parsed.get('options', []):
+        sym = o['symbol'].upper()
+        seen.add(sym)
+        # sync_ibkr quantities are abs()-agnostic elsewhere, but options keep
+        # their sign — a short call is a negative position by design.
+        upsert(by_opt.get(sym), {'kind': 'option', 'label': o['symbol'],
+                                 'quantity': o['quantity'],
+                                 'address': o.get('occ')})
+    for sym, a in by_opt.items():
+        if sym not in seen:
+            client.table('net_worth_assets').delete().eq('id', a['id']).execute()
+            removed += 1
+    # Legacy combined line, superseded by per-contract rows.
+    for a in existing:
+        if a['kind'] == 'option_net':
+            client.table('net_worth_assets').delete().eq('id', a['id']).execute()
+            removed += 1
+
+    # --- single-row line: cash (EUR value as quantity) ---
+    if parsed.get('cash_eur') is not None:
+        match = next((a for a in existing if a['kind'] == 'cash'), None)
+        upsert(match, {'kind': 'cash', 'label': 'IBKR cash',
+                       'quantity': round(parsed['cash_eur'], 2), 'address': None})
 
     return {'added': added, 'updated': updated, 'removed': removed}
 

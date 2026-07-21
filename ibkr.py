@@ -4,11 +4,30 @@ extracts everything the Net Worth tab tracks:
 
   stocks    -> symbol + quantity                (priced live via Yahoo)
   warrants  -> name + ISIN + quantity           (priced live via Onvista)
-  options   -> one net EUR value line           (statement value; tiny, no live source)
+  options   -> per-contract positions           (priced live via Yahoo, OCC symbol)
   cash      -> ending cash in base currency EUR (statement value)
 """
 import csv
 import io
+import re
+from datetime import datetime
+
+# "AMZN 21AUG26 280 C" -> root / expiry / strike / right
+_OPT_RE = re.compile(r'^(\w+)\s+(\d{2}[A-Z]{3}\d{2})\s+([\d.]+)\s+([CP])$')
+
+
+def occ_symbol(ib_symbol):
+    """IBKR option symbol -> OCC contract symbol Yahoo quotes directly,
+    e.g. 'AMZN 21AUG26 280 C' -> 'AMZN260821C00280000'. None if unparseable."""
+    m = _OPT_RE.match(ib_symbol.strip().upper())
+    if not m:
+        return None
+    root, expiry, strike, right = m.groups()
+    try:
+        d = datetime.strptime(expiry, '%d%b%y')
+    except ValueError:
+        return None
+    return f"{root}{d.strftime('%y%m%d')}{right}{int(round(float(strike) * 1000)):08d}"
 
 
 def _f(val, default=0.0):
@@ -30,8 +49,7 @@ def parse_statement(file_bytes):
                 and r[1] == 'Data' and r[2] == 'Warrants'):
             warrant_info[r[3]] = {'isin': r[6], 'name': r[4]}
 
-    stocks, warrants = [], []
-    options_value_eur = None
+    stocks, warrants, options = [], [], []
     cash_eur = None
 
     for r in rows:
@@ -48,9 +66,14 @@ def parse_statement(file_bytes):
                         'isin': info.get('isin', ''),
                         'quantity': _f(r[7]),
                     })
-            # EUR total for options: net value already in base currency
-            elif r[1] == 'Total' and r[3] == 'Equity and Index Options' and r[4] == 'EUR':
-                options_value_eur = _f(r[12])
+                elif r[3] == 'Equity and Index Options':
+                    # Quantity is signed (negative = short); ×100 multiplier
+                    # is applied at valuation time.
+                    options.append({
+                        'symbol': r[5],
+                        'occ': occ_symbol(r[5]),
+                        'quantity': _f(r[7]),
+                    })
 
         # Cash Report: Ending Cash / Base Currency Summary -> Total column
         if (len(r) > 4 and r[0] == 'Cash Report' and r[1] == 'Data'
@@ -63,6 +86,6 @@ def parse_statement(file_bytes):
     return {
         'stocks': stocks,
         'warrants': warrants,
-        'options_value_eur': options_value_eur,
+        'options': options,
         'cash_eur': cash_eur,
     }

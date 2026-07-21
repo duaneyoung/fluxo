@@ -342,13 +342,15 @@ def _compute_networth():
                 price_f[a['id']] = ex.submit(networth.stock_quote_eur, a['label'])
             elif a['kind'] == 'warrant' and a['address']:
                 price_f[a['id']] = ex.submit(networth.warrant_quote_eur, a['address'])
+            elif a['kind'] == 'option' and a['address']:
+                price_f[a['id']] = ex.submit(networth.option_quote_eur, a['address'])
             elif a['kind'] == 'crypto' and a['address']:
                 price_f[a['id']] = ex.submit(networth.btc_address_balance, a['address'])
         btc = btc_f.result()
         cards = cards_f.result()
         prices = {k: f.result() for k, f in price_f.items()}
 
-    stocks, crypto, manual, warrants, flat = [], [], [], [], []
+    stocks, crypto, manual, warrants, options, flat = [], [], [], [], [], []
     for a in assets:
         if a['kind'] == 'stock':
             price = prices.get(a['id'])
@@ -358,6 +360,13 @@ def _compute_networth():
             price = prices.get(a['id'])
             warrants.append({**a, 'price': price,
                              'value': round(price * a['quantity'], 2) if price else None})
+        elif a['kind'] == 'option':
+            # Premium is per share; one contract covers 100. Quantity is
+            # signed, so a short call correctly contributes negative value.
+            price = prices.get(a['id'])
+            options.append({**a, 'price': price,
+                            'value': round(price * a['quantity'] * 100, 2)
+                            if price is not None else None})
         elif a['kind'] in ('cash', 'option_net'):
             # Statement-valued lines: quantity IS the EUR value (can be
             # negative for a net-short options book). No live pricing.
@@ -373,10 +382,11 @@ def _compute_networth():
             crypto.append({**a, 'qty': qty, 'live': live is not None,
                            'value': round(qty * btc, 2) if btc else None})
 
-    # One combined "financial markets" list: stocks + warrants + statement
-    # lines (cash / options net) with a type tag
+    # One combined "financial markets" list: stocks + warrants + options +
+    # statement lines (cash) with a type tag
     markets = ([{**s, 'type': 'Stock', 'ident': s['label']} for s in stocks]
                + [{**w, 'type': 'Warrant', 'ident': w['address']} for w in warrants]
+               + [{**o, 'type': 'Option', 'ident': o['address']} for o in options]
                + [{**f, 'price': None, 'ident': f['label']} for f in flat])
 
     cards = networth.cardvault_snapshot()
