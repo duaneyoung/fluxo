@@ -377,12 +377,17 @@ _snap_state = {'date': None}
 
 
 def _take_daily_snapshot():
+    saved = False
     try:
         nw = _compute_networth()
         if not nw['table_missing'] and nw['totals']['net'] > 0:
-            db.save_networth_snapshot(nw['totals'])
+            saved = db.save_networth_snapshot(nw['totals'])
     except Exception:
         pass  # never let the snapshot break anything
+    if not saved:
+        # Release the day-claim so a later request retries instead of
+        # silently skipping the whole day.
+        _snap_state['date'] = None
 
 
 @app.before_request
