@@ -698,6 +698,70 @@ def delete_asset(asset_id):
     get_client().table('net_worth_assets').delete().eq('id', asset_id).execute()
 
 
+def sync_ibkr(parsed):
+    """Mirror an IBKR statement into net_worth_assets.
+
+    Stocks are matched by symbol (label), warrants by ISIN (address);
+    quantities update in place, new positions are inserted and positions
+    that disappeared from the statement are deleted — the statement is
+    treated as the source of truth for those two kinds. Cash and the
+    options net value land in single rows of kind 'cash' / 'option_net'
+    with the EUR value stored as quantity.
+    """
+    client = get_client()
+    existing = get_assets() or []
+    added = updated = removed = 0
+
+    def upsert(match, payload):
+        nonlocal added, updated
+        if match:
+            client.table('net_worth_assets').update(payload) \
+                .eq('id', match['id']).execute()
+            updated += 1
+        else:
+            client.table('net_worth_assets').insert(payload).execute()
+            added += 1
+
+    # --- stocks: keyed by symbol ---
+    by_symbol = {a['label'].upper(): a for a in existing if a['kind'] == 'stock'}
+    seen = set()
+    for s in parsed['stocks']:
+        sym = s['symbol'].upper()
+        seen.add(sym)
+        upsert(by_symbol.get(sym), {'kind': 'stock', 'label': s['symbol'],
+                                    'quantity': s['quantity'], 'address': None})
+    for sym, a in by_symbol.items():
+        if sym not in seen:
+            client.table('net_worth_assets').delete().eq('id', a['id']).execute()
+            removed += 1
+
+    # --- warrants: keyed by ISIN (address column) ---
+    by_isin = {a['address'].upper(): a for a in existing
+               if a['kind'] == 'warrant' and a['address']}
+    seen = set()
+    for w in parsed['warrants']:
+        isin = w['isin'].upper()
+        seen.add(isin)
+        upsert(by_isin.get(isin), {'kind': 'warrant', 'label': w['name'],
+                                   'quantity': w['quantity'], 'address': w['isin']})
+    for isin, a in by_isin.items():
+        if isin not in seen:
+            client.table('net_worth_assets').delete().eq('id', a['id']).execute()
+            removed += 1
+
+    # --- single-row lines: cash + options net (EUR value as quantity) ---
+    for kind, label, value in (('cash', 'IBKR cash', parsed.get('cash_eur')),
+                               ('option_net', 'IBKR options (net)',
+                                parsed.get('options_value_eur'))):
+        if value is None:
+            continue
+        match = next((a for a in existing if a['kind'] == kind), None)
+        upsert(match, {'kind': kind, 'label': label,
+                       'quantity': round(value, 2), 'address': None})
+
+    return {'added': added, 'updated': updated, 'removed': removed}
+
+
 # --- NET WORTH HISTORY (daily snapshots) ---
 def save_networth_snapshot(totals):
     """Upsert today's snapshot — page loads refresh the same-day row, so the

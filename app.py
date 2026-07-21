@@ -348,7 +348,7 @@ def _compute_networth():
         cards = cards_f.result()
         prices = {k: f.result() for k, f in price_f.items()}
 
-    stocks, crypto, manual, warrants = [], [], [], []
+    stocks, crypto, manual, warrants, flat = [], [], [], [], []
     for a in assets:
         if a['kind'] == 'stock':
             price = prices.get(a['id'])
@@ -358,6 +358,11 @@ def _compute_networth():
             price = prices.get(a['id'])
             warrants.append({**a, 'price': price,
                              'value': round(price * a['quantity'], 2) if price else None})
+        elif a['kind'] in ('cash', 'option_net'):
+            # Statement-valued lines: quantity IS the EUR value (can be
+            # negative for a net-short options book). No live pricing.
+            flat.append({**a, 'type': 'Cash' if a['kind'] == 'cash' else 'Options',
+                         'value': round(a['quantity'], 2)})
         elif a['kind'] == 'manual':
             manual.append({**a, 'value': round(a['quantity'], 2)})
         else:
@@ -368,9 +373,11 @@ def _compute_networth():
             crypto.append({**a, 'qty': qty, 'live': live is not None,
                            'value': round(qty * btc, 2) if btc else None})
 
-    # One combined "financial markets" list: stocks + warrants with a type tag
+    # One combined "financial markets" list: stocks + warrants + statement
+    # lines (cash / options net) with a type tag
     markets = ([{**s, 'type': 'Stock', 'ident': s['label']} for s in stocks]
-               + [{**w, 'type': 'Warrant', 'ident': w['address']} for w in warrants])
+               + [{**w, 'type': 'Warrant', 'ident': w['address']} for w in warrants]
+               + [{**f, 'price': None, 'ident': f['label']} for f in flat])
 
     cards = networth.cardvault_snapshot()
     totals = {
@@ -452,6 +459,27 @@ def networth_add():
 def networth_delete(asset_id):
     db.delete_asset(asset_id)
     return redirect(url_for('networth_view'))
+
+
+@app.route('/networth/import-ibkr', methods=['POST'])
+def networth_import_ibkr():
+    """Upload an IBKR activity statement CSV — positions, cash and the
+    options net value replace the current stock/warrant holdings."""
+    import ibkr
+    import networth
+    file = request.files.get('file')
+    if not file:
+        return redirect(url_for('networth_view'))
+    try:
+        parsed = ibkr.parse_statement(file.read())
+    except ValueError as exc:
+        return redirect(url_for('networth_view', error=str(exc)))
+    summary = db.sync_ibkr(parsed)
+    networth.clear_cache()  # new symbols/ISINs should price immediately
+    return redirect(url_for('networth_view',
+                            synced=f"{summary['added']} added · "
+                                   f"{summary['updated']} updated · "
+                                   f"{summary['removed']} removed"))
 
 
 @app.route('/health')
