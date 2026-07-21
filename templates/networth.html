@@ -6,6 +6,8 @@
         <h1>Net worth</h1>
         <div class="sub">Financial markets, crypto and collectibles — live valuations, refreshed every ~10 min</div>
     </div>
+    <a class="btn sm" href="{{ url_for('networth_view', refresh=1) }}"
+       onclick="this.textContent='⟳ Refreshing…';this.style.pointerEvents='none'">⟳ Refresh prices</a>
 </div>
 
 {% if table_missing %}
@@ -57,7 +59,8 @@
 
 <!-- Financial markets: stocks + warrants -->
 <div class="panel glass">
-    <h2>Financial markets <span style="font-size:.75rem;color:var(--muted);font-weight:500">stocks via Yahoo · warrants via Onvista</span></h2>
+    <h2>Financial markets <span style="font-size:.75rem;color:var(--muted);font-weight:500">stocks via Yahoo · warrants via Onvista</span>
+        {% if fetch_times.markets %}<span class="fetched-at" data-ts="{{ fetch_times.markets }}"></span>{% endif %}</h2>
     {% if markets %}
     <div class="table-wrap"><table>
         <thead><tr><th>Instrument</th><th>Type</th><th class="num">Qty</th><th class="num">Price</th><th class="num">Value</th><th></th></tr></thead>
@@ -115,7 +118,8 @@
 
 <!-- Crypto -->
 <div class="panel glass" style="margin-top:1.2rem">
-        <h2>Crypto {% if btc_price %}<span style="font-size:.75rem;color:var(--muted);font-weight:500">BTC {{ currency_symbol }}{{ btc_price|money }}</span>{% endif %}</h2>
+        <h2>Crypto {% if btc_price %}<span style="font-size:.75rem;color:var(--muted);font-weight:500">BTC {{ currency_symbol }}{{ btc_price|money }}</span>{% endif %}
+            {% if fetch_times.crypto %}<span class="fetched-at" data-ts="{{ fetch_times.crypto }}"></span>{% endif %}</h2>
         {% if crypto %}
         <div class="table-wrap"><table>
             <thead><tr><th>Wallet</th><th class="num">BTC</th><th class="num">Value</th><th></th></tr></thead>
@@ -155,7 +159,8 @@
 
 <!-- Collectibles -->
 <div class="panel glass" style="margin-top:1.2rem">
-    <h2>Collectibles / Business <span style="font-size:.75rem;color:var(--muted);font-weight:500">from CardVault</span></h2>
+    <h2>Collectibles / Business <span style="font-size:.75rem;color:var(--muted);font-weight:500">from CardVault</span>
+        {% if fetch_times.collectibles %}<span class="fetched-at" data-ts="{{ fetch_times.collectibles }}"></span>{% endif %}</h2>
     {% if cards %}
     <div class="metrics" style="margin-bottom:0">
         <div class="metric glass"><div class="lbl">Market value</div>
@@ -176,6 +181,15 @@
 
 {% block scripts %}
 <script>
+// Per-section "updated at" chips — rendered client-side so times are local.
+document.querySelectorAll('.fetched-at').forEach(el => {
+    const d = new Date(parseFloat(el.dataset.ts) * 1000);
+    const time = d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+    const sameDay = d.toDateString() === new Date().toDateString();
+    el.textContent = 'updated ' + (sameDay ? time
+        : d.toLocaleDateString([], {month: 'short', day: 'numeric'}) + ', ' + time);
+});
+
 const HISTORY = {{ history_json|safe }};
 if (HISTORY.length && document.getElementById('nwChart')) {
     new Chart(document.getElementById('nwChart'), {

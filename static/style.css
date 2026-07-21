@@ -187,6 +187,9 @@ tbody tr:hover{background:rgba(255,255,255,.03)}
 .tag.in{background:rgba(74,222,128,.16);color:#86efac}
 .tag.out{background:rgba(239,68,68,.16);color:#fca5a5}
 .tag.one{background:rgba(236,72,153,.16);color:#f9a8d4}
+.fetched-at{font-size:.68rem;font-weight:500;color:var(--muted);
+  background:rgba(255,255,255,.05);border:1px solid var(--glass-brd);
+  padding:.15rem .55rem;border-radius:999px;white-space:nowrap;vertical-align:middle}
 .row-actions{display:flex;gap:.4rem;justify-content:flex-end}
 .icon-btn{background:rgba(255,255,255,.06);border:1px solid var(--glass-brd);color:var(--text);
   width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:.8rem;display:grid;place-items:center}

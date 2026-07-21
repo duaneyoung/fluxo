@@ -403,6 +403,12 @@ def _daily_snapshot_hook():
 
 @app.route('/networth')
 def networth_view():
+    import networth
+    # ?refresh=1 drops the quote cache so this very request re-fetches all
+    # prices. Done in-request (not POST+redirect) because with 2 gunicorn
+    # workers a redirect could land on the other worker's still-warm cache.
+    if request.args.get('refresh') == '1':
+        networth.clear_cache()
     nw = _compute_networth()
 
     # Page visits refresh today's snapshot with the freshest valuation.
@@ -416,7 +422,9 @@ def networth_view():
                            btc_price=nw['btc'],
                            table_missing=nw['table_missing'],
                            history=history,
-                           history_json=json.dumps(history or []))
+                           history_json=json.dumps(history or []),
+                           fetch_times=networth.section_fetch_times())
+
 
 
 @app.route('/networth/add', methods=['POST'])

@@ -36,6 +36,25 @@ def _store(key, value):
     return value
 
 
+def clear_cache():
+    """Drop all cached quotes so the next compute re-fetches everything.
+    _last_good survives — it's the stale-fallback, not a freshness cache."""
+    _cache.clear()
+
+
+def section_fetch_times():
+    """Oldest successful fetch per section (unix ts) — conservative, so the
+    'updated at' label never claims data is fresher than its stalest quote."""
+    def oldest(pred):
+        ts = [t for k, (_, t) in _cache.items() if pred(k)]
+        return min(ts) if ts else None
+    return {
+        'markets': oldest(lambda k: k.startswith(('q:', 'w:'))),
+        'crypto': oldest(lambda k: k == 'btc' or k.startswith('addr:')),
+        'collectibles': oldest(lambda k: k == 'cardvault'),
+    }
+
+
 def _get(url, **kw):
     return httpx.get(url, timeout=8, follow_redirects=True, **kw)
 
