@@ -55,3 +55,12 @@ create table if not exists net_worth_history (
     other         numeric default 0,
     total         numeric default 0
 );
+
+-- ============ ROW LEVEL SECURITY (added 2026-07-21) ============
+-- The app talks to Supabase with the service-role (secret) key, which
+-- bypasses RLS. Enabling RLS with NO policies blocks the public anon key
+-- entirely — run once in the SQL editor:
+alter table transactions       enable row level security;
+alter table settings           enable row level security;
+alter table net_worth_assets   enable row level security;
+alter table net_worth_history  enable row level security;
