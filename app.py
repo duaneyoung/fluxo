@@ -3,16 +3,66 @@ Fluxo — personal finance tracker.
 Backend: Flask + Supabase (Postgres). Server-rendered Jinja templates.
 """
 import io
+import os
 import csv
+import hmac
 import json
+import time
+import hashlib
+from datetime import timedelta
 
 from flask import (Flask, render_template, request, jsonify, redirect,
-                   url_for, send_file, Response)
+                   url_for, send_file, Response, session)
 
 import db
 
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 3600  # cache static assets 1h
+
+# --- AUTH (single user) ---
+# APP_PASSWORD set -> every page requires login. Unset -> open (local dev).
+# SECRET_KEY is optional: deriving it from the password keeps sessions valid
+# across restarts and both gunicorn workers with a single env var.
+APP_PASSWORD = os.environ.get('APP_PASSWORD', '')
+app.secret_key = (os.environ.get('SECRET_KEY')
+                  or hashlib.sha256(f'fluxo:{APP_PASSWORD}'.encode()).hexdigest())
+app.permanent_session_lifetime = timedelta(days=180)
+app.config.update(SESSION_COOKIE_SAMESITE='Lax',
+                  SESSION_COOKIE_SECURE=bool(os.environ.get('RENDER')))
+
+
+@app.before_request
+def _auth_gate():
+    if not APP_PASSWORD:
+        return
+    p = request.path
+    # /health stays open for the daily cron pings (it also triggers the
+    # net-worth snapshot hook); static + manifest for the login page / PWA.
+    if p in ('/login', '/health', '/manifest.json') or p.startswith('/static/'):
+        return
+    if session.get('auth'):
+        return
+    return redirect(url_for('login'))
+
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    error = None
+    if request.method == 'POST':
+        if APP_PASSWORD and hmac.compare_digest(
+                request.form.get('password', ''), APP_PASSWORD):
+            session.permanent = True
+            session['auth'] = True
+            return redirect(url_for('dashboard'))
+        time.sleep(0.8)  # blunt brute-force damper
+        error = 'Wrong password'
+    return render_template('login.html', error=error)
+
+
+@app.route('/logout', methods=['POST'])
+def logout():
+    session.clear()
+    return redirect(url_for('login'))
 
 try:
     from flask_compress import Compress

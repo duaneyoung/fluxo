@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Fluxo — Sign in</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <meta name="theme-color" content="#0e1020">
+    <link rel="icon" type="image/png" sizes="192x192" href="{{ url_for('static', filename='icon-192.png') }}">
+    <link rel="apple-touch-icon" href="{{ url_for('static', filename='apple-touch-icon.png') }}">
+    <style>
+        .login-wrap{min-height:100dvh;display:flex;align-items:center;justify-content:center;padding:1.4rem}
+        .login-card{width:100%;max-width:380px;padding:2.4rem 2rem;text-align:center;border-radius:24px}
+        .login-logo{font-size:2.6rem;background:linear-gradient(135deg,#7c5cff,#b06ab3);
+            -webkit-background-clip:text;background-clip:text;color:transparent;line-height:1}
+        .login-card h1{margin:.7rem 0 .2rem;font-size:1.5rem}
+        .login-card .sub{color:var(--muted);font-size:.85rem;margin-bottom:1.6rem}
+        .login-err{color:#fca5a5;font-size:.82rem;margin-top:.8rem}
+    </style>
+</head>
+<body>
+<div class="login-wrap">
+    <form method="post" class="glass login-card" autocomplete="on">
+        <div class="login-logo">◈</div>
+        <h1>Fluxo</h1>
+        <div class="sub">Private — enter your password</div>
+        <div class="fg">
+            <input type="password" name="password" placeholder="Password" required autofocus
+                   autocomplete="current-password" style="text-align:center">
+        </div>
+        <button class="btn full" type="submit" style="margin-top:1rem">Unlock</button>
+        {% if error %}<div class="login-err">{{ error }}</div>{% endif %}
+    </form>
+</div>
+</body>
+</html>
