@@ -544,8 +544,9 @@ def networth_import_ibkr():
 
 @app.route('/health')
 def health():
-    """Cheap keep-alive target — no DB, no templates."""
-    return 'ok', 200
+    """Cheap keep-alive target — no DB, no templates.
+    Also reports whether the auth gate is armed (env var visible)."""
+    return ('ok locked' if APP_PASSWORD else 'ok open'), 200
 
 
 @app.route('/manifest.json')
