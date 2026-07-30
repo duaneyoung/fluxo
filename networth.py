@@ -180,26 +180,65 @@ def cardvault_snapshot():
         from supabase import create_client
         client = create_client(CARDVAULT_URL, CARDVAULT_KEY)
         purchases = client.table('purchases').select(
-            'code,purchase_price,grading_cost,cardmarket_id').execute().data
+            'code,purchase_price,grading_cost,cardmarket_id,in_bundle').execute().data
         sold = {r['item_code'] for r in
                 client.table('sales').select('item_code').execute().data}
         trends = {r['id_product']: r.get('trend') for r in
                   client.table('market_prices').select('id_product,trend').execute().data}
-        in_stock = [p for p in purchases if p['code'] not in sold]
+        # Set -> member purchase codes. Sets have no Cardmarket link of their
+        # own; CardVault values them at the sum of their members' trends, so
+        # mirror that here to keep the collectibles figure identical.
+        try:
+            bm = client.table('bundle_members').select(
+                'set_code,purchase_code').execute().data
+        except Exception:
+            bm = []
+        members_by_set = {}
+        for r in bm:
+            members_by_set.setdefault(r.get('set_code'), []).append(r.get('purchase_code'))
+        row_by_code = {p['code']: p for p in purchases}
+
+        # Exclude cards consumed into a set (in_bundle): the set row already
+        # carries their value, so counting both double-counts. This mirrors
+        # CardVault's get_purchases(), keeping the two apps aligned.
+        in_stock = [p for p in purchases
+                    if p['code'] not in sold and not p.get('in_bundle')]
 
         def f(x):
             return float(x) if x is not None else 0.0
 
-        def trend(p):
+        def own_trend(p):
             t = trends.get(p.get('cardmarket_id')) if p.get('cardmarket_id') else None
             return float(t) if t is not None else None
 
-        cost = sum(f(p['purchase_price']) + f(p['grading_cost']) for p in in_stock)
+        def set_trend(set_code):
+            """Sum of the set's linked members' trends; None if none linked."""
+            total, linked = 0.0, 0
+            for mc in members_by_set.get(set_code, []):
+                m = row_by_code.get(mc)
+                if not m:
+                    continue
+                t = own_trend(m)
+                if t is not None:
+                    total += t
+                    linked += 1
+            return round(total, 2) if linked else None
+
+        def market(p):
+            """Market trend for a position: set members' sum for a set row,
+            else the item's own linked trend. None when unpriced."""
+            if p['code'] in members_by_set:
+                return set_trend(p['code'])
+            return own_trend(p)
+
+        def cost_of(p):
+            return f(p['purchase_price']) + f(p['grading_cost'])
+
+        cost = sum(cost_of(p) for p in in_stock)
         value = sum(
-            t if (t := trend(p)) is not None
-            else f(p['purchase_price']) + f(p['grading_cost'])
+            m if (m := market(p)) is not None else cost_of(p)
             for p in in_stock)
-        priced = sum(1 for p in in_stock if trend(p) is not None)
+        priced = sum(1 for p in in_stock if market(p) is not None)
         return _store('cardvault', {
             'items': len(in_stock),
             'priced': priced,
