@@ -140,6 +140,23 @@
     <button type="submit" class="btn full">Preview import</button>
 </form>
 
+<form method="post" action="{{ url_for('import_intesa') }}" enctype="multipart/form-data"
+      class="glass panel" style="margin-bottom:1.2rem">
+    <h3 style="margin-bottom:.4rem">Import an Intesa Sanpaolo export (Excel)</h3>
+    <p style="color:var(--muted);font-size:.86rem;margin-bottom:1.1rem">
+        Upload the "Lista Operazioni" export from Intesa (.xlsx). The file
+        usually spans the last 30 days — only the current month is kept, so
+        it won't re-import last month's tail. Transactions are auto-classified
+        from Intesa's own categories, with the same editable preview and
+        duplicate detection before anything is saved.
+    </p>
+    <div class="fg" style="margin-bottom:1.1rem">
+        <input type="file" name="file" accept=".xlsx,.xls" required
+               style="padding:.9rem;border-style:dashed">
+    </div>
+    <button type="submit" class="btn full">Preview import</button>
+</form>
+
 <form method="post" action="{{ url_for('import_transactions') }}" enctype="multipart/form-data" class="glass panel">
     <h3 style="margin-bottom:.4rem">Bulk import from CSV (MoneyBlox format)</h3>
     <p style="color:var(--muted);font-size:.86rem;margin-bottom:1.1rem">

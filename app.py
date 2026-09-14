@@ -312,6 +312,14 @@ def import_pluxee():
     return _bank_preview(pluxee.parse_export, 'Pluxee')
 
 
+@app.route('/transactions/import-intesa', methods=['POST'])
+def import_intesa():
+    """Parse an Intesa Sanpaolo 'Lista Operazioni' export (current month
+    only) and show the editable preview."""
+    import intesa
+    return _bank_preview(intesa.parse_export, 'Intesa')
+
+
 @app.route('/transactions/import-revolut/confirm', methods=['POST'])
 def import_revolut_confirm():
     """Insert the (user-edited) preview rows."""
