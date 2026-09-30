@@ -381,32 +381,46 @@ def save_categories():
     return jsonify({'success': True})
 
 
-def _compute_networth():
-    """Value every asset. All external quotes are fetched in parallel —
-    sequentially, 20+ HTTP calls can stack to minutes when a provider
-    throttles."""
-    from concurrent.futures import ThreadPoolExecutor
+_NW_BUDGET = 8  # seconds the page waits for live quotes before using fallbacks
+
+
+def _compute_networth(budget=_NW_BUDGET):
+    """Value every asset. All external quotes are fetched in parallel and
+    the page waits at most `budget` seconds: anything still in flight falls
+    back to its last good value and keeps running in the background, so it
+    lands in the cache for the next load instead of stalling this one."""
+    from concurrent.futures import ThreadPoolExecutor, wait
     import networth
     assets = db.get_assets()
     table_missing = assets is None
     assets = assets or []
 
-    with ThreadPoolExecutor(max_workers=8) as ex:
-        btc_f = ex.submit(networth.btc_price_eur)
-        cards_f = ex.submit(networth.cardvault_snapshot)
-        price_f = {}
-        for a in assets:
-            if a['kind'] == 'stock':
-                price_f[a['id']] = ex.submit(networth.stock_quote_eur, a['label'])
-            elif a['kind'] == 'warrant' and a['address']:
-                price_f[a['id']] = ex.submit(networth.warrant_quote_eur, a['address'])
-            elif a['kind'] == 'option' and a['address']:
-                price_f[a['id']] = ex.submit(networth.option_quote_eur, a['address'])
-            elif a['kind'] == 'crypto' and a['address']:
-                price_f[a['id']] = ex.submit(networth.btc_address_balance, a['address'])
-        btc = btc_f.result()
-        cards = cards_f.result()
-        prices = {k: f.result() for k, f in price_f.items()}
+    ex = ThreadPoolExecutor(max_workers=16)
+    btc_f = ex.submit(networth.btc_price_eur)
+    cards_f = ex.submit(networth.cardvault_snapshot)
+    price_f, price_key = {}, {}
+    for a in assets:
+        if a['kind'] == 'stock':
+            price_f[a['id']] = ex.submit(networth.stock_quote_eur, a['label'])
+            price_key[a['id']] = f"q:{a['label'].upper()}"
+        elif a['kind'] == 'warrant' and a['address']:
+            price_f[a['id']] = ex.submit(networth.warrant_quote_eur, a['address'])
+            price_key[a['id']] = f"w:{a['address'].upper()}"
+        elif a['kind'] == 'option' and a['address']:
+            price_f[a['id']] = ex.submit(networth.option_quote_eur, a['address'])
+            price_key[a['id']] = f"o:{a['address'].upper()}"
+        elif a['kind'] == 'crypto' and a['address']:
+            price_f[a['id']] = ex.submit(networth.btc_address_balance, a['address'])
+            price_key[a['id']] = f"addr:{a['address']}"
+    _, pending = wait([btc_f, cards_f, *price_f.values()], timeout=budget)
+    ex.shutdown(wait=False)  # stragglers finish in the background
+
+    def res(fut, key):
+        return fut.result() if fut.done() else networth.last_good(key)
+
+    btc = res(btc_f, 'btc')
+    cards = res(cards_f, 'cardvault')
+    prices = {k: res(f, price_key[k]) for k, f in price_f.items()}
 
     stocks, crypto, manual, warrants, options, flat = [], [], [], [], [], []
     for a in assets:
@@ -447,7 +461,6 @@ def _compute_networth():
                + [{**o, 'type': 'Option', 'ident': o['address']} for o in options]
                + [{**f, 'price': None, 'ident': f['label']} for f in flat])
 
-    cards = networth.cardvault_snapshot()
     totals = {
         'markets': round(sum(m['value'] or 0 for m in markets), 2),
         'crypto': round(sum(c['value'] or 0 for c in crypto), 2),
@@ -458,7 +471,9 @@ def _compute_networth():
 
     return {'markets': markets, 'crypto': crypto, 'manual': manual,
             'cards': cards, 'totals': totals, 'btc': btc,
-            'table_missing': table_missing}
+            'table_missing': table_missing,
+            # False when some quote missed the budget and a fallback was used
+            'complete': not pending}
 
 
 # One snapshot per day, triggered by ANY request (incl. the /health ping a
@@ -469,7 +484,7 @@ _snap_state = {'date': None}
 def _take_daily_snapshot():
     saved = False
     try:
-        nw = _compute_networth()
+        nw = _compute_networth(budget=60)  # background: no user waiting
         if not nw['table_missing'] and nw['totals']['net'] > 0:
             saved = db.save_networth_snapshot(nw['totals'])
     except Exception:
@@ -487,6 +502,8 @@ def _daily_snapshot_hook():
     today = _date.today().isoformat()
     if _snap_state['date'] == today:
         return
+    if request.endpoint == 'networth_view':
+        return  # the page computes + saves the snapshot itself; don't double the work
     _snap_state['date'] = today  # claim the day before spawning (no stampede)
     threading.Thread(target=_take_daily_snapshot, daemon=True).start()
 
@@ -501,8 +518,9 @@ def networth_view():
         networth.clear_cache()
     nw = _compute_networth()
 
-    # Page visits refresh today's snapshot with the freshest valuation.
-    if not nw['table_missing'] and nw['totals']['net'] > 0:
+    # Page visits refresh today's snapshot with the freshest valuation —
+    # skipped when a quote timed out, so a partial total never overwrites it.
+    if not nw['table_missing'] and nw['complete'] and nw['totals']['net'] > 0:
         db.save_networth_snapshot(nw['totals'])
     history = db.get_networth_history()
 

@@ -1,15 +1,17 @@
 """
 Net worth valuations — live prices with a small in-memory TTL cache.
 
-  stocks       -> Stooq quotes (free, no key), USD auto-converted to EUR
-  bitcoin      -> CoinGecko simple price (EUR)
-  BTC address  -> mempool.space balance (optional per-wallet)
-  collectibles -> CardVault Supabase (in-stock items at Cardmarket trend)
+  stocks       -> Yahoo quotes (free, no key), non-EUR auto-converted to EUR
+  bitcoin      -> CoinGecko / Binance / Kraken price (EUR)
+  BTC address  -> Blockstream / blockchain.info / mempool.space balance
+  collectibles -> CardVault Supabase (in-stock items at slab price or
+                  Cardmarket trend, same as CardVault's own market value)
 
 Every fetcher fails soft (returns None) so the page renders even when a
 provider is down.
 """
 import os
+import threading
 import time
 
 import httpx
@@ -22,24 +24,46 @@ CARDVAULT_KEY = os.environ.get('CARDVAULT_SUPABASE_KEY')
 
 _cache = {}
 _TTL = 600  # seconds
+_FAIL_TTL = 120  # after a failed fetch, don't retry (and re-wait) for this long
+
+_last_good = {}  # key -> value; survives TTL expiry as a stale fallback
+_failed = {}     # key -> ts of the last failed fetch (negative cache)
 
 
 def _cached(key):
+    """Fresh cached value, else None. After a recent failure, returns the
+    last good value instead so a dead provider doesn't cost a timeout on
+    every page load."""
     hit = _cache.get(key)
     if hit and time.time() - hit[1] < _TTL:
         return hit[0]
+    if time.time() - _failed.get(key, 0) < _FAIL_TTL:
+        return _last_good.get(key)
     return None
 
 
 def _store(key, value):
     _cache[key] = (value, time.time())
+    _last_good[key] = value
+    _failed.pop(key, None)
     return value
+
+
+def _fail(key):
+    """Record a failed fetch; returns the stale fallback (or None)."""
+    _failed[key] = time.time()
+    return _last_good.get(key)
+
+
+def last_good(key):
+    return _last_good.get(key)
 
 
 def clear_cache():
     """Drop all cached quotes so the next compute re-fetches everything.
     _last_good survives — it's the stale-fallback, not a freshness cache."""
     _cache.clear()
+    _failed.clear()
 
 
 def section_fetch_times():
@@ -56,10 +80,7 @@ def section_fetch_times():
 
 
 def _get(url, **kw):
-    return httpx.get(url, timeout=8, follow_redirects=True, **kw)
-
-
-_last_good = {}  # key -> value; survives TTL expiry as a stale fallback
+    return httpx.get(url, timeout=kw.pop('timeout', 8), follow_redirects=True, **kw)
 
 
 def btc_price_eur():
@@ -80,16 +101,15 @@ def btc_price_eur():
     )
     for fetch in providers:
         try:
-            price = fetch()
-            _last_good['btc'] = price
-            return _store('btc', price)
+            return _store('btc', fetch())
         except Exception:
             continue
     # All providers down: serve the last price we ever saw rather than blanking.
-    return _last_good.get('btc')
+    return _fail('btc')
 
 
 _UA = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+_fx_lock = threading.Lock()
 
 
 def _yahoo_quote(symbol):
@@ -107,8 +127,13 @@ def _fx_to_eur(currency):
     key = f'fx:{currency}'
     if (v := _cached(key)) is not None:
         return v
-    price, _ = _yahoo_quote(f'{currency}EUR=X')
-    return _store(key, price)
+    # Single-flight: concurrent USD quotes share one FX fetch instead of
+    # each hitting Yahoo (which throttles bursts).
+    with _fx_lock:
+        if (v := _cached(key)) is not None:
+            return v
+        price, _ = _yahoo_quote(f'{currency}EUR=X')
+        return _store(key, price)
 
 
 def stock_quote_eur(symbol):
@@ -120,7 +145,7 @@ def stock_quote_eur(symbol):
         price, currency = _yahoo_quote(symbol)
         return _store(key, round(price * _fx_to_eur(currency), 2))
     except Exception:
-        return None
+        return _fail(key)
 
 
 def option_quote_eur(occ_symbol):
@@ -134,7 +159,7 @@ def option_quote_eur(occ_symbol):
         price, currency = _yahoo_quote(occ_symbol)
         return _store(key, round(price * _fx_to_eur(currency), 3))
     except Exception:
-        return None
+        return _fail(key)
 
 
 def warrant_quote_eur(isin):
@@ -149,48 +174,117 @@ def warrant_quote_eur(isin):
         q = r.json().get('quote', {})
         price = q.get('last') if q.get('last') is not None else q.get('bid')
         if price is None:
-            return None
+            return _fail(key)
         return _store(key, round(float(price), 3))
     except Exception:
-        return None
+        return _fail(key)
+
+
+def _esplora_balance(base, address):
+    """Esplora API (Blockstream / mempool.space): confirmed + unconfirmed sats."""
+    d = _get(f'{base}/api/address/{address}', timeout=6).json()
+    c, m = d['chain_stats'], d['mempool_stats']
+    return (c['funded_txo_sum'] - c['spent_txo_sum']
+            + m['funded_txo_sum'] - m['spent_txo_sum'])
 
 
 def btc_address_balance(address):
-    """Confirmed balance of a BTC address, in BTC."""
+    """Balance of a BTC address in BTC (incl. unconfirmed), with a provider
+    fallback chain. mempool.space alone blanked out intermittently (DNS/rate
+    limits), which silently froze the wallet at its typed-in quantity."""
     key = f'addr:{address}'
     if (v := _cached(key)) is not None:
         return v
-    try:
-        r = _get(f'https://mempool.space/api/address/{address}')
-        d = r.json()['chain_stats']
-        sats = d['funded_txo_sum'] - d['spent_txo_sum']
-        return _store(key, round(sats / 1e8, 8))
-    except Exception:
-        return None
+    providers = (
+        lambda: _esplora_balance('https://blockstream.info', address),
+        lambda: int(_get('https://blockchain.info/balance',
+                         params={'active': address}, timeout=6)
+                    .json()[address]['final_balance']),
+        lambda: _esplora_balance('https://mempool.space', address),
+    )
+    for fetch in providers:
+        try:
+            return _store(key, round(fetch() / 1e8, 8))
+        except Exception:
+            continue
+    return _fail(key)
+
+
+def _fetch_all(client, table, cols, page_size=1000):
+    """Every row of a table, paging past PostgREST's 1000-row cap."""
+    out, start = [], 0
+    while True:
+        page = client.table(table).select(cols) \
+            .range(start, start + page_size - 1).execute().data
+        out.extend(page)
+        if len(page) < page_size:
+            return out
+        start += page_size
+
+
+def _norm_company(s):
+    """Mirror of CardVault graded_prices.norm_company."""
+    s = (s or '').strip().upper()
+    return {'BECKETT': 'BGS', 'BVG': 'BGS', 'CGC CARDS': 'CGC',
+            'TAG GRADING': 'TAG', 'ACE GRADING': 'ACE'}.get(s, s)
+
+
+def _norm_grade(s):
+    """Mirror of CardVault graded_prices.norm_grade: '10.0' -> '10',
+    '10 Black Label' -> '10 BL', 'Pristine 10' -> '10 P'."""
+    import re
+    raw = str(s if s is not None else '')
+    m = re.search(r'\d+(?:[.,]\d+)?', raw)
+    if not m:
+        return ''
+    v = float(m.group(0).replace(',', '.'))
+    g = str(int(v)) if v == int(v) else str(v)
+    low = raw.lower()
+    if 'black' in low:
+        return g + ' BL'
+    if 'pristine' in low:
+        return g + ' P'
+    return g
+
+
+_cv_client = None  # CardVault Supabase client, created once per process
 
 
 def cardvault_snapshot():
-    """Collectibles valuation straight from CardVault's Supabase:
-    in-stock items at Cardmarket trend (cost as fallback per item)."""
+    """Collectibles valuation straight from CardVault's Supabase, matching
+    CardVault's own market value: in-stock items at slab price (graded +
+    Collectr-linked) or Cardmarket trend, cost as fallback per item."""
     if (v := _cached('cardvault')) is not None:
         return v
     if not (CARDVAULT_URL and CARDVAULT_KEY):
         return None
     try:
         from supabase import create_client
-        client = create_client(CARDVAULT_URL, CARDVAULT_KEY)
-        purchases = client.table('purchases').select(
-            'code,purchase_price,grading_cost,cardmarket_id,in_bundle').execute().data
-        sold = {r['item_code'] for r in
-                client.table('sales').select('item_code').execute().data}
+        global _cv_client
+        if _cv_client is None:
+            _cv_client = create_client(CARDVAULT_URL, CARDVAULT_KEY)
+        client = _cv_client
+        purchases = _fetch_all(
+            client, 'purchases',
+            'code,purchase_price,grading_cost,cardmarket_id,in_bundle,'
+            'graded,grade,grading_company,collectr_id,price_company')
+        sold = {r['item_code'] for r in _fetch_all(client, 'sales', 'item_code')}
         trends = {r['id_product']: r.get('trend') for r in
-                  client.table('market_prices').select('id_product,trend').execute().data}
+                  _fetch_all(client, 'market_prices', 'id_product,trend')}
+        # Slab prices (Collectr) — CardVault values graded items linked to a
+        # Collectr product at the price for their company + grade, ahead of
+        # the raw Cardmarket trend. Fail-soft if the table doesn't exist.
+        try:
+            graded = {(str(r['collectr_id']), r['grading_company'], r['grade']): r.get('price')
+                      for r in _fetch_all(client, 'graded_prices',
+                                          'collectr_id,grading_company,grade,price')}
+        except Exception:
+            graded = {}
         # Set -> member purchase codes. Sets have no Cardmarket link of their
         # own; CardVault values them at the sum of their members' trends, so
         # mirror that here to keep the collectibles figure identical.
         try:
-            bm = client.table('bundle_members').select(
-                'set_code,purchase_code').execute().data
+            bm = _fetch_all(client, 'bundle_members', 'set_code,purchase_code')
         except Exception:
             bm = []
         members_by_set = {}
@@ -224,12 +318,24 @@ def cardvault_snapshot():
                     linked += 1
             return round(total, 2) if linked else None
 
+        def slab_price(p):
+            """Collectr slab price for a graded, Collectr-linked item, keyed
+            like CardVault's _graded_key (proxy company wins if set)."""
+            cid = str(p.get('collectr_id') or '').strip()
+            if not cid or (p.get('graded') or 'N') != 'Y':
+                return None
+            company = (p.get('price_company') or '').strip() or p.get('grading_company')
+            price = graded.get((cid, _norm_company(company), _norm_grade(p.get('grade'))))
+            return float(price) if price is not None else None
+
         def market(p):
-            """Market trend for a position: set members' sum for a set row,
-            else the item's own linked trend. None when unpriced."""
+            """Market value for a position, same precedence as CardVault's
+            get_purchases: set members' sum for a set row, else slab price,
+            else the item's own Cardmarket trend. None when unpriced."""
             if p['code'] in members_by_set:
                 return set_trend(p['code'])
-            return own_trend(p)
+            s = slab_price(p)
+            return s if s is not None else own_trend(p)
 
         def cost_of(p):
             return f(p['purchase_price']) + f(p['grading_cost'])
@@ -245,5 +351,6 @@ def cardvault_snapshot():
             'cost': round(cost, 2),
             'value': round(value, 2),
         })
-    except Exception:
-        return None
+    except Exception as exc:
+        print(f'[networth] CardVault snapshot failed: {exc}')
+        return _fail('cardvault')
