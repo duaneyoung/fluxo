@@ -320,6 +320,14 @@ def import_intesa():
     return _bank_preview(intesa.parse_export, 'Intesa')
 
 
+@app.route('/transactions/import-amex', methods=['POST'])
+def import_amex():
+    """Parse an American Express 'Estratto Conto' PDF and show the
+    editable preview."""
+    import amex
+    return _bank_preview(amex.parse_export, 'American Express')
+
+
 @app.route('/transactions/import-revolut/confirm', methods=['POST'])
 def import_revolut_confirm():
     """Insert the (user-edited) preview rows."""

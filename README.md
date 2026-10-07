@@ -19,7 +19,12 @@ a configurable category manager. Built to match the MoneyBlox CSV format.
 - **Transactions:** full searchable/filterable table, per-row edit/delete, CSV export.
 - **Add transaction:** manual form with an inline calendar, quick-category buttons,
   cascading category_1 → category_2 → category_3 selects, payment method, notes, and a
-  one-off toggle. Plus a **file-upload tab** for bulk CSV import (MoneyBlox format).
+  one-off toggle. Plus a **file-upload tab** for bank imports (Revolut CSV/XLSX, Pluxee
+  PDF, Intesa Sanpaolo XLSX, American Express "Estratto Conto" PDF), each with the same
+  auto-classified, editable preview and duplicate detection, and a bulk CSV import
+  (MoneyBlox format). On Amex statements the payment debited from the current account
+  is pre-unticked as an internal transfer; the card fee and imposta di bollo go to
+  Subscriptions/Amex.
 - **Settings:** currency selector + a hierarchical category-tree manager.
 
 ## Architecture
@@ -61,6 +66,14 @@ python app.py
 
 Requires a `.env` file with `SUPABASE_URL` and `SUPABASE_KEY` (copy from `.env.example`).
 
+## Run tests
+
+Tests run in demo mode (in-memory store, never touch Supabase):
+
+```
+uv run --python 3.12 --with-requirements requirements.txt --with pytest==8.3.3 python -m pytest tests -q
+```
+
 ## First-time setup
 
 1. Create a Supabase project (dashboard.supabase.com).
@@ -90,6 +103,11 @@ Set `SUPABASE_URL` and `SUPABASE_KEY` in the Render dashboard → Environment.
 moneyblox/
   app.py                 # Flask routes
   db.py                  # Supabase data access + analytics + constants
+  revolut.py             # Revolut CSV/XLSX importer
+  pluxee.py              # Pluxee transaction-report PDF importer
+  intesa.py              # Intesa Sanpaolo "Lista Operazioni" XLSX importer
+  amex.py                # American Express "Estratto Conto" PDF importer
+  tests/                 # pytest suite (Amex importer + upload route)
   schema.sql             # DB tables (run once in Supabase SQL editor)
   requirements.txt
   render.yaml            # Render deployment config
