@@ -86,11 +86,24 @@
     <div class="chart-head">
         <div>
             <h2 style="margin:0">Income vs expenses</h2>
+            {% if filters.business_only %}
+            <div class="sub" style="color:var(--muted);font-size:.85rem">Income › Business vs Investments › Business · changes measured on {{ trends.ref_label }}</div>
+            {% else %}
             <div class="sub" style="color:var(--muted);font-size:.85rem">Monthly totals since the beginning · changes measured on {{ trends.ref_label }}</div>
+            {% endif %}
         </div>
+        <label class="toggle-chip kbd {% if filters.business_only %}on{% endif %}">
+            <input type="checkbox" name="business_only" value="1" form="filter-form"
+                   onchange="this.form.submit()" {% if filters.business_only %}checked{% endif %}> Business only
+        </label>
     </div>
     <div class="delta-strip">
-        {% for key, label, color in [('income','Income','var(--green)'), ('expenses','Expenses','var(--red)'), ('investments','Investments','#fbbf24')] %}
+        {% if filters.business_only %}
+        {% set delta_series = [('income','Business revenue','var(--green)'), ('expenses','Business costs','var(--red)')] %}
+        {% else %}
+        {% set delta_series = [('income','Income','var(--green)'), ('expenses','Expenses','var(--red)'), ('investments','Investments','#fbbf24')] %}
+        {% endif %}
+        {% for key, label, color in delta_series %}
         <div class="delta-group">
             <span class="dot" style="background:{{ color }}"></span>
             <span class="delta-name">{{ label }}</span>
@@ -197,15 +210,18 @@ if (TRENDS) {
         data: {
             labels: TRENDS.labels,
             datasets: [
-                { label: 'Income', data: TRENDS.income, borderColor: '#4ade80',
+                { label: TRENDS.business_only ? 'Business revenue' : 'Income', data: TRENDS.income, borderColor: '#4ade80',
                   backgroundColor: 'rgba(74,222,128,.08)', fill: true,
                   borderWidth: 2.4, tension: .3, pointRadius: 2, pointHoverRadius: 4 },
-                { label: 'Expenses', data: TRENDS.expenses, borderColor: '#ef4444',
+                { label: TRENDS.business_only ? 'Business costs' : 'Expenses', data: TRENDS.expenses, borderColor: '#ef4444',
                   backgroundColor: 'transparent',
                   borderWidth: 2.4, tension: .3, pointRadius: 2, pointHoverRadius: 4 },
+                // Business costs == business investments, so the dashed line would duplicate it.
+                ...(TRENDS.business_only ? [] : [
                 { label: 'of which investments', data: TRENDS.investments, borderColor: '#fbbf24',
                   backgroundColor: 'transparent', borderDash: [6, 4],
                   borderWidth: 1.8, tension: .3, pointRadius: 0, pointHoverRadius: 4 },
+                ]),
             ]
         },
         options: {

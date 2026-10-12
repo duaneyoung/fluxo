@@ -166,6 +166,10 @@ QUICK_CATEGORIES = [
     {'label': 'Business',  'icon': '💼', 'path': ['Investments', 'Business', '']},
 ]
 
+# (category_1, category_2) pairs used by the "Business only" trend toggle.
+BUSINESS_INCOME = ('Income', 'Business')
+BUSINESS_COST = ('Investments', 'Business')
+
 
 def _f(val, default=0.0):
     try:
@@ -520,10 +524,14 @@ def get_dashboard_data(timeframe='this_month', exclude_investments=False,
     return {'stats': stats, 'breakdown': breakdown, 'chart': chart, 'recent': recent}
 
 
-def get_trends(all_txs=None):
+def get_trends(all_txs=None, business_only=False):
     """Monthly income / expenses / investments series across full history,
     plus MoM and YoY deltas computed on the last *complete* month (the
-    current month is partial and would always read as a drop)."""
+    current month is partial and would always read as a drop).
+
+    business_only: income counts only Income > Business inflows and
+    expenses/investments only Investments > Business outflows. Month buckets
+    still come from every dated transaction, so the x-axis is unchanged."""
     if all_txs is None:
         all_txs = get_transactions()
 
@@ -533,7 +541,15 @@ def get_trends(all_txs=None):
             continue
         m = t['date'][:7]
         d = monthly.setdefault(m, {'income': 0.0, 'expenses': 0.0, 'investments': 0.0})
-        if t['transaction_type'] == 'inflow':
+        if business_only:
+            cats = (t['category_1'], t['category_2'])
+            if t['transaction_type'] == 'inflow':
+                if cats == BUSINESS_INCOME:
+                    d['income'] += t['amount']
+            elif cats == BUSINESS_COST:
+                d['expenses'] += t['amount']
+                d['investments'] += t['amount']
+        elif t['transaction_type'] == 'inflow':
             d['income'] += t['amount']
         else:
             d['expenses'] += t['amount']
@@ -583,6 +599,7 @@ def get_trends(all_txs=None):
         'investments': [round(monthly[m]['investments'], 2) for m in months],
         'ref_label': datetime.strptime(last_full, '%Y-%m').strftime('%B %Y'),
         'deltas': deltas,
+        'business_only': business_only,
     }
 
 

@@ -16,6 +16,8 @@ a configurable category manager. Built to match the MoneyBlox CSV format.
   chosen previous months, with a ranking badge ("#2 of 6 as of day 17"); spending-by-
   category breakdown; and a recent-transactions list. Filters (exclude investments,
   exclude RSUs, exclude one-offs, timeframe) apply consistently across all sections.
+  The monthly "Income vs expenses" chart has its own **Business only** toggle
+  (`?business_only=1`) that limits it to Income › Business vs Investments › Business.
 - **Transactions:** full searchable/filterable table, per-row edit/delete, CSV export.
 - **Add transaction:** manual form with an inline calendar, quick-category buttons,
   cascading category_1 → category_2 → category_3 selects, payment method, notes, and a

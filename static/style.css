@@ -116,6 +116,10 @@ h3{font-size:1.05rem;font-weight:600}
 .toggle-chip.on{color:#fff;background:linear-gradient(135deg,rgba(79,70,229,.55),rgba(124,58,237,.55));
   border-color:rgba(124,92,255,.6);box-shadow:0 2px 10px rgba(79,70,229,.3)}
 .toggle-chip.on::before{content:'✓';font-size:.7rem}
+/* Keyboard-operable chip: checkbox visually hidden but still focusable */
+.toggle-chip.kbd{position:relative}
+.toggle-chip.kbd input{display:inline;position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}
+.toggle-chip.kbd:focus-within{outline:2px solid rgba(124,92,255,.8);outline-offset:2px}
 select,input[type=text],input[type=number],input[type=date],input[type=search],textarea{
   font-family:inherit;background:rgba(255,255,255,.05);border:1px solid var(--glass-brd);
   color:var(--text);border-radius:10px;padding:.6rem .8rem;font-size:.9rem;outline:none;width:100%;

@@ -105,6 +105,7 @@ def dashboard():
     exclude_investments = _truthy('exclude_investments')
     exclude_rsu = _truthy('exclude_rsu')
     exclude_one_off = _truthy('exclude_one_off')
+    business_only = _truthy('business_only')
 
     all_txs = db.get_transactions()
     months = db.available_months(all_txs)
@@ -122,7 +123,7 @@ def dashboard():
         compare_months=compare,
         all_txs=all_txs,
     )
-    trends = db.get_trends(all_txs=all_txs)
+    trends = db.get_trends(all_txs=all_txs, business_only=business_only)
 
     return render_template(
         'dashboard.html',
@@ -136,6 +137,7 @@ def dashboard():
             'exclude_investments': exclude_investments,
             'exclude_rsu': exclude_rsu,
             'exclude_one_off': exclude_one_off,
+            'business_only': business_only,
         },
         chart_json=json.dumps(data['chart']),
     )
