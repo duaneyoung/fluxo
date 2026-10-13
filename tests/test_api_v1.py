@@ -136,8 +136,41 @@ def test_create_rejects_bad_input(api):
                     json={'date': 'nope', 'transaction_type': 'x'}, headers=AUTH)
     assert resp.status_code == 400
     assert resp.get_json() == {'error': 'invalid',
-                               'fields': ['date', 'transaction_type']}
+                               'fields': ['date', 'transaction_type', 'amount']}
     assert db._demo_txs == []
+
+
+@pytest.mark.parametrize('amount', ['abc', '', None, 'nan', 'inf', [1]])
+def test_create_rejects_non_numeric_amount(api, amount):
+    resp = api.post('/api/v1/transactions', json={**TX, 'amount': amount},
+                    headers=AUTH)
+    assert resp.status_code == 400
+    assert resp.get_json() == {'error': 'invalid', 'fields': ['amount']}
+    assert db._demo_txs == []
+
+
+def test_create_rejects_missing_amount(api):
+    payload = {k: v for k, v in TX.items() if k != 'amount'}
+    resp = api.post('/api/v1/transactions', json=payload, headers=AUTH)
+    assert resp.status_code == 400
+    assert resp.get_json() == {'error': 'invalid', 'fields': ['amount']}
+
+
+@pytest.mark.parametrize('amount,expected', [('7.25', 7.25), (3, 3.0), (4.5, 4.5)])
+def test_create_accepts_numeric_amount(api, amount, expected):
+    resp = api.post('/api/v1/transactions', json={**TX, 'amount': amount},
+                    headers=AUTH)
+    assert resp.status_code == 201
+    assert resp.get_json()['amount'] == expected
+
+
+def test_update_rejects_non_numeric_amount(api):
+    tx_id = api.post('/api/v1/transactions', json=TX, headers=AUTH).get_json()['id']
+    resp = api.put(f'/api/v1/transactions/{tx_id}',
+                   json={**TX, 'amount': 'twelve'}, headers=AUTH)
+    assert resp.status_code == 400
+    assert resp.get_json() == {'error': 'invalid', 'fields': ['amount']}
+    assert api.get(f'/api/v1/transactions/{tx_id}', headers=AUTH).get_json()['amount'] == 12.5
 
 
 def test_update_returns_row(api):
@@ -160,6 +193,12 @@ def test_delete(api):
     resp = api.delete(f'/api/v1/transactions/{tx_id}', headers=AUTH)
     assert resp.get_json() == {'deleted': tx_id}
     assert api.get(f'/api/v1/transactions/{tx_id}', headers=AUTH).status_code == 404
+
+
+def test_delete_unknown_is_404(api):
+    resp = api.delete('/api/v1/transactions/999', headers=AUTH)
+    assert resp.status_code == 404
+    assert resp.get_json() == {'error': 'not_found'}
 
 
 # --- net worth ---

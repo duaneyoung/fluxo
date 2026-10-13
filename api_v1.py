@@ -5,6 +5,7 @@ Thin wrappers over the existing db.* / net-worth helpers — no business logic
 lives here. Auth (bearer token, fail closed) is enforced by app._auth_gate
 for every /api/v1/* path before any handler runs.
 """
+import math
 import sys
 
 from flask import Blueprint, current_app, jsonify, request
@@ -34,6 +35,14 @@ def _app_module():
     return sys.modules[current_app.import_name]
 
 
+def _is_number(v):
+    """int, float or numeric string; rejects None/''/text/NaN/Inf."""
+    try:
+        return math.isfinite(float(v))
+    except (TypeError, ValueError):
+        return False
+
+
 def _invalid_tx(payload):
     """Minimal input check so the API can't write rows the web form would
     never produce. Returns the list of bad field names."""
@@ -42,6 +51,8 @@ def _invalid_tx(payload):
         bad.append('date')
     if payload.get('transaction_type', 'outflow') not in db.TX_TYPES:
         bad.append('transaction_type')
+    if not _is_number(payload.get('amount')):
+        bad.append('amount')
     return bad
 
 
@@ -137,6 +148,8 @@ def update_transaction(tx_id):
 
 @bp.delete('/transactions/<int:tx_id>')
 def delete_transaction(tx_id):
+    if db.get_transaction(tx_id) is None:
+        return _not_found()
     db.delete_transaction(tx_id)
     return jsonify({'deleted': tx_id})
 
