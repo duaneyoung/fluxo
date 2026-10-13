@@ -31,8 +31,25 @@ app.config.update(SESSION_COOKIE_SAMESITE='Lax',
                   SESSION_COOKIE_SECURE=bool(os.environ.get('RENDER')))
 
 
+def _api_auth():
+    """Bearer-token gate for /api/v1/* (native iOS client). Fails closed:
+    no API_TOKEN configured -> 503, regardless of APP_PASSWORD. Only the
+    Authorization header counts (session cookies are ignored), and it never
+    redirects to /login."""
+    token = os.environ.get('API_TOKEN', '')
+    if not token:
+        return jsonify({'error': 'api_disabled'}), 503
+    header = request.headers.get('Authorization', '')
+    supplied = header[7:] if header.startswith('Bearer ') else ''
+    if not supplied or not hmac.compare_digest(supplied.encode(), token.encode()):
+        return jsonify({'error': 'unauthorized'}), 401
+    return None
+
+
 @app.before_request
 def _auth_gate():
+    if request.path.startswith('/api/v1/'):
+        return _api_auth()
     if not APP_PASSWORD:
         return
     p = request.path
@@ -512,7 +529,7 @@ def _daily_snapshot_hook():
     today = _date.today().isoformat()
     if _snap_state['date'] == today:
         return
-    if request.endpoint == 'networth_view':
+    if request.endpoint in ('networth_view', 'api_v1.networth'):
         return  # the page computes + saves the snapshot itself; don't double the work
     _snap_state['date'] = today  # claim the day before spawning (no stampede)
     threading.Thread(target=_take_daily_snapshot, daemon=True).start()
@@ -576,6 +593,10 @@ def networth_import_ibkr():
                             synced=f"{summary['added']} added · "
                                    f"{summary['updated']} updated · "
                                    f"{summary['removed']} removed"))
+
+
+import api_v1  # noqa: E402 — JSON API for the native iOS app
+app.register_blueprint(api_v1.bp)
 
 
 @app.route('/health')

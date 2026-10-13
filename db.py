@@ -377,26 +377,30 @@ def _row_demo_normalize(row):
 
 
 def add_transaction(form):
+    """Insert one transaction and return the created row."""
     _invalidate_tx_cache()
     if DEMO:
         _ensure_seed()
         _demo_seq['id'] += 1
         row = {'id': _demo_seq['id'], **_row_demo_normalize(_form_to_row(form))}
         _demo_txs.append(row)
-        return
-    get_client().table('transactions').insert(_form_to_row(form)).execute()
+        return row
+    return get_client().table('transactions').insert(_form_to_row(form)).execute().data[0]
 
 
 def edit_transaction(tx_id, form):
+    """Update one transaction; return the updated row (None if no such id)."""
     _invalidate_tx_cache()
     if DEMO:
         _ensure_seed()
         for i, t in enumerate(_demo_txs):
             if t['id'] == int(tx_id):
                 _demo_txs[i] = {'id': t['id'], **_row_demo_normalize(_form_to_row(form))}
-                break
-        return
-    get_client().table('transactions').update(_form_to_row(form)).eq('id', tx_id).execute()
+                return _demo_txs[i]
+        return None
+    rows = get_client().table('transactions').update(_form_to_row(form)) \
+        .eq('id', tx_id).execute().data
+    return rows[0] if rows else None
 
 
 def delete_transaction(tx_id):

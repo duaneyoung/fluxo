@@ -6,9 +6,13 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -w 2 --threads 4 app:app
+    # One worker so the in-process quote cache and snapshot day-claim are
+    # shared by every request (web + iOS API); threads keep it concurrent.
+    startCommand: gunicorn -w 1 --threads 8 app:app
     envVars:
       - key: SUPABASE_URL
         sync: false   # set this in the Render dashboard (secret)
       - key: SUPABASE_KEY
         sync: false   # set this in the Render dashboard (secret)
+      - key: API_TOKEN
+        sync: false   # bearer token for /api/v1 (iOS app); unset = API disabled
